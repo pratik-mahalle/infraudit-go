@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"math/rand"
@@ -8,6 +9,8 @@ import (
 	"os"
 	"sync"
 	"time"
+
+	"infraaudit/backend/internal/services"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -221,6 +224,17 @@ func main() {
 	r.Get("/api/cost-analysis", handleCostAnalysis)
 	r.Get("/api/cost-anomalies", handleCostAnomalies)
 	r.Get("/api/security-drifts", handleSecurityDrifts)
+
+	// Subscription & Billing stubs
+	r.Get("/api/subscriptions/plans", handleSubscriptionPlans)
+	r.Get("/api/billing/history", handleBillingHistory)
+	r.Get("/api/subscriptions/status", handleSubscriptionStatus)
+	r.Post("/api/subscriptions/checkout", handleCreateCheckout)
+
+	// Scanning and dashboard
+	r.Post("/api/scan/run", handleRunScan)
+	r.Get("/api/scan/status", handleScanStatus)
+	r.Get("/api/dashboard/overview", handleDashboardOverview)
 
 	// AI analysis and recommendations
 	r.Post("/api/ai-analysis/analyze/cost/{resourceId}", handleAICostAnalysis)
@@ -481,6 +495,260 @@ func handleSecurityDrifts(w http.ResponseWriter, r *http.Request) {
 				DetectedAt: time.Now().Format(time.RFC3339), Status: "open",
 			})
 		}
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+// ---- Subscriptions & Billing stubs ----
+
+type SubscriptionPlan struct {
+	ID           string   `json:"id"`
+	Name         string   `json:"name"`
+	PriceMonthly int      `json:"priceMonthly"`
+	Currency     string   `json:"currency"`
+	Description  string   `json:"description"`
+	Features     []string `json:"features"`
+	TrialDays    int      `json:"trialDays"`
+	MostPopular  bool     `json:"mostPopular"`
+	// Compatibility fields for frontends expecting simple price fields
+	Price       int    `json:"price"`    // same as monthly price in major units
+	Interval    string `json:"interval"` // e.g. "month"
+	YearlyPrice int    `json:"yearlyPrice"`
+}
+
+func handleSubscriptionPlans(w http.ResponseWriter, r *http.Request) {
+	plans := []SubscriptionPlan{
+		{
+			ID:           "free",
+			Name:         "Free",
+			PriceMonthly: 0,
+			Currency:     "USD",
+			Description:  "Get started with core features",
+			Features:     []string{"Up to 1 cloud account", "Basic cost charts", "Weekly reports"},
+			TrialDays:    0,
+			MostPopular:  false,
+			Price:        0,
+			Interval:     "month",
+			YearlyPrice:  0,
+		},
+		{
+			ID:           "pro",
+			Name:         "Pro",
+			PriceMonthly: 49,
+			Currency:     "USD",
+			Description:  "Advanced monitoring for teams",
+			Features:     []string{"Unlimited accounts", "Anomaly detection", "Slack alerts"},
+			TrialDays:    14,
+			MostPopular:  true,
+			Price:        49,
+			Interval:     "month",
+			YearlyPrice:  490,
+		},
+		{
+			ID:           "enterprise",
+			Name:         "Enterprise",
+			PriceMonthly: 199,
+			Currency:     "USD",
+			Description:  "Security & scale for large orgs",
+			Features:     []string{"SSO/SAML", "RBAC", "Premium support"},
+			TrialDays:    30,
+			MostPopular:  false,
+			Price:        199,
+			Interval:     "month",
+			YearlyPrice:  1990,
+		},
+	}
+	writeJSON(w, http.StatusOK, plans)
+}
+
+type Invoice struct {
+	ID          string `json:"id"`
+	Date        string `json:"date"`
+	Amount      int    `json:"amount"`
+	Currency    string `json:"currency"`
+	Status      string `json:"status"`
+	Description string `json:"description"`
+}
+
+func handleBillingHistory(w http.ResponseWriter, r *http.Request) {
+	// Generate a small synthetic invoice history
+	now := time.Now()
+	invoices := []Invoice{
+		{ID: "inv-" + randID(), Date: now.AddDate(0, -2, 0).Format("2006-01-02"), Amount: 49, Currency: "USD", Status: "paid", Description: "Pro plan - 2 months ago"},
+		{ID: "inv-" + randID(), Date: now.AddDate(0, -1, 0).Format("2006-01-02"), Amount: 49, Currency: "USD", Status: "paid", Description: "Pro plan - last month"},
+	}
+	writeJSON(w, http.StatusOK, invoices)
+}
+
+// Subscription status shape kept simple for UI integration
+func handleSubscriptionStatus(w http.ResponseWriter, r *http.Request) {
+	// Demo: pretend user is on free plan with active trial
+	status := map[string]any{
+		"plan": map[string]any{
+			"id":   "free",
+			"name": "Free",
+		},
+		"status":            "active",
+		"cancelAtPeriodEnd": false,
+		"currentPeriodEnd":  time.Now().AddDate(0, 1, 0).Format(time.RFC3339),
+		"trial": map[string]any{
+			"status":        "active",
+			"daysRemaining": 7,
+		},
+	}
+	writeJSON(w, http.StatusOK, status)
+}
+
+// Create Stripe checkout session (stubbed)
+func handleCreateCheckout(w http.ResponseWriter, r *http.Request) {
+	type checkoutRequest struct {
+		Plan string `json:"plan"`
+	}
+	var req checkoutRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Plan == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"message": "invalid plan"})
+		return
+	}
+	// In real implementation, look up authenticated user
+	userID := int64(1)
+	var stripe services.StripeService = &services.InMemoryStripe{}
+	url, err := stripe.CreateCheckout(r.Context(), userID, req.Plan)
+	if err != nil {
+		log.Printf("stripe checkout error: %v", err)
+		writeJSON(w, http.StatusBadGateway, map[string]string{"message": "checkout failed"})
+		return
+	}
+	writeJSON(w, http.StatusCreated, map[string]string{"checkoutUrl": url})
+}
+
+// ---- Scanning and Dashboard ----
+
+type ScanStatus struct {
+	JobID          string         `json:"jobId"`
+	Running        bool           `json:"running"`
+	StartedAt      *time.Time     `json:"startedAt,omitempty"`
+	CompletedAt    *time.Time     `json:"completedAt,omitempty"`
+	Progress       int            `json:"progress"`
+	NumResources   int            `json:"numResources"`
+	ProviderCounts map[string]int `json:"providerCounts"`
+	Message        string         `json:"message,omitempty"`
+}
+
+var currentScan ScanStatus
+
+func handleRunScan(w http.ResponseWriter, r *http.Request) {
+	stateMu.Lock()
+	if currentScan.Running {
+		out := currentScan
+		stateMu.Unlock()
+		writeJSON(w, http.StatusAccepted, out)
+		return
+	}
+	job := "scan-" + randID()
+	now := time.Now()
+	currentScan = ScanStatus{JobID: job, Running: true, StartedAt: &now, Progress: 0, ProviderCounts: map[string]int{}}
+	stateMu.Unlock()
+
+	go func() {
+		ctx := context.Background()
+		var aggregated []CloudResource
+		providersToScan := []string{"aws", "gcp", "azure"}
+		step := 100
+		if len(providersToScan) > 0 {
+			step = 100 / len(providersToScan)
+		}
+
+		for _, id := range providersToScan {
+			stateMu.Lock()
+			p := providers[id]
+			stateMu.Unlock()
+
+			if p == nil || !p.IsConnected {
+				stateMu.Lock()
+				if currentScan.Progress+step <= 100 {
+					currentScan.Progress += step
+				}
+				stateMu.Unlock()
+				continue
+			}
+
+			switch id {
+			case "aws":
+				awsCreds := AWSCredentials{AccessKeyID: p.AWSAccessKeyID, SecretAccessKey: p.AWSSecretAccessKey, Region: p.AWSRegion}
+				if items, err := awsListResources(ctx, awsCreds); err == nil {
+					aggregated = append(aggregated, items...)
+				} else {
+					log.Printf("scan aws error: %v", err)
+				}
+			case "gcp":
+				gcpCreds := GCPCredentials{ProjectID: p.GCPProjectID, ServiceAccountJSON: p.GCPServiceAccountJSON, Region: p.GCPRegion}
+				if items, err := gcpListResources(ctx, gcpCreds); err == nil {
+					aggregated = append(aggregated, items...)
+				} else {
+					log.Printf("scan gcp error: %v", err)
+				}
+			case "azure":
+				azCreds := AzureCredentials{TenantID: p.AzureTenantID, ClientID: p.AzureClientID, ClientSecret: p.AzureClientSecret, SubscriptionID: p.AzureSubscriptionID, Location: p.AzureLocation}
+				if items, err := azureListResources(ctx, azCreds); err == nil {
+					aggregated = append(aggregated, items...)
+				} else {
+					log.Printf("scan azure error: %v", err)
+				}
+			}
+
+			stateMu.Lock()
+			if currentScan.Progress+step <= 100 {
+				currentScan.Progress += step
+			}
+			stateMu.Unlock()
+		}
+
+		stateMu.Lock()
+		resources = aggregated
+		counts := map[string]int{}
+		for _, cr := range resources {
+			counts[cr.Provider]++
+		}
+		nowDone := time.Now()
+		currentScan.ProviderCounts = counts
+		currentScan.NumResources = len(resources)
+		currentScan.CompletedAt = &nowDone
+		currentScan.Running = false
+		currentScan.Progress = 100
+		stateMu.Unlock()
+	}()
+
+	writeJSON(w, http.StatusAccepted, map[string]any{"jobId": job, "status": "started"})
+}
+
+func handleScanStatus(w http.ResponseWriter, r *http.Request) {
+	stateMu.Lock()
+	defer stateMu.Unlock()
+	writeJSON(w, http.StatusOK, currentScan)
+}
+
+func handleDashboardOverview(w http.ResponseWriter, r *http.Request) {
+	stateMu.Lock()
+	defer stateMu.Unlock()
+	providerCounts := map[string]int{}
+	typeCounts := map[string]int{}
+	regionCounts := map[string]int{}
+	for _, cr := range resources {
+		providerCounts[cr.Provider]++
+		typeCounts[cr.Type]++
+		regionCounts[cr.Region]++
+	}
+	out := map[string]any{
+		"resourcesTotal": len(resources),
+		"providersConnected": map[string]bool{
+			"aws":   providers["aws"].IsConnected,
+			"gcp":   providers["gcp"].IsConnected,
+			"azure": providers["azure"].IsConnected,
+		},
+		"providerCounts": providerCounts,
+		"typeCounts":     typeCounts,
+		"regionCounts":   regionCounts,
+		"lastScan":       currentScan,
 	}
 	writeJSON(w, http.StatusOK, out)
 }
