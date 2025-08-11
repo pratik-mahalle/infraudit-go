@@ -26,7 +26,7 @@ func azureListResources(ctx context.Context, creds AzureCredentials) ([]CloudRes
 
 	var out []CloudResource
 
-	// Enumerate resource groups and list VMs and Storage accounts within
+	// Enumerate resource groups and list resources within
 	rgClient, err := armresources.NewResourceGroupsClient(creds.SubscriptionID, cred, nil)
 	if err != nil {
 		return nil, err
@@ -40,6 +40,8 @@ func azureListResources(ctx context.Context, creds AzureCredentials) ([]CloudRes
 		}
 		for _, rg := range page.Value {
 			group := *rg.Name
+
+			// Virtual Machines
 			vmClient, err := armcompute.NewVirtualMachinesClient(creds.SubscriptionID, cred, nil)
 			if err == nil {
 				vmPager := vmClient.NewListPager(group, nil)
@@ -58,13 +60,48 @@ func azureListResources(ctx context.Context, creds AzureCredentials) ([]CloudRes
 						if vm.ID != nil {
 							id = *vm.ID
 						}
-						out = append(out, CloudResource{ID: id, Name: name, Type: "VM", Provider: "azure", Region: creds.Location, Status: "unknown"})
+						region := creds.Location
+						if vm.Location != nil && *vm.Location != "" {
+							region = *vm.Location
+						}
+						out = append(out, CloudResource{ID: id, Name: name, Type: "VM", Provider: "azure", Region: region, Status: "unknown"})
 					}
 				}
 			} else {
 				log.Printf("azure vm client error: %v", err)
 			}
 
+			// Virtual Machine Scale Sets
+			vmssClient, err := armcompute.NewVirtualMachineScaleSetsClient(creds.SubscriptionID, cred, nil)
+			if err == nil {
+				vmssPager := vmssClient.NewListPager(group, nil)
+				for vmssPager.More() {
+					vmssPage, err := vmssPager.NextPage(ctx)
+					if err != nil {
+						log.Printf("azure list vmss error: %v", err)
+						break
+					}
+					for _, ss := range vmssPage.Value {
+						name := "vmss"
+						if ss.Name != nil {
+							name = *ss.Name
+						}
+						id := ""
+						if ss.ID != nil {
+							id = *ss.ID
+						}
+						region := creds.Location
+						if ss.Location != nil && *ss.Location != "" {
+							region = *ss.Location
+						}
+						out = append(out, CloudResource{ID: id, Name: name, Type: "VMSS", Provider: "azure", Region: region, Status: "unknown"})
+					}
+				}
+			} else {
+				log.Printf("azure vmss client error: %v", err)
+			}
+
+			// Storage accounts
 			stClient, err := armstorage.NewAccountsClient(creds.SubscriptionID, cred, nil)
 			if err == nil {
 				stPager := stClient.NewListByResourceGroupPager(group, nil)
@@ -83,7 +120,11 @@ func azureListResources(ctx context.Context, creds AzureCredentials) ([]CloudRes
 						if acc.ID != nil {
 							id = *acc.ID
 						}
-						out = append(out, CloudResource{ID: id, Name: name, Type: "Storage", Provider: "azure", Region: creds.Location, Status: "available"})
+						region := creds.Location
+						if acc.Location != nil && *acc.Location != "" {
+							region = *acc.Location
+						}
+						out = append(out, CloudResource{ID: id, Name: name, Type: "Storage", Provider: "azure", Region: region, Status: "available"})
 					}
 				}
 			} else {

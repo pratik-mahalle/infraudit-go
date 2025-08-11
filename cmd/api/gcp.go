@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 
 	compute "cloud.google.com/go/compute/apiv1"
@@ -27,30 +26,29 @@ func gcpListResources(ctx context.Context, creds GCPCredentials) ([]CloudResourc
 
 	var out []CloudResource
 
-	// Compute Engine instances (zonal)
+	// Compute Engine instances across all zones via AggregatedList
 	instClient, err := compute.NewInstancesRESTClient(ctx, opts...)
 	if err == nil {
 		defer instClient.Close()
-		// If region not provided, try common zones
-		zones := []string{"us-central1-a", "us-east1-b", "us-west1-a"}
-		if creds.Region != "" {
-			// Region provided; list a couple of common zones in that region
-			zones = []string{fmt.Sprintf("%s-a", creds.Region), fmt.Sprintf("%s-b", creds.Region)}
-		}
-		for _, zone := range zones {
-			req := &computepb.ListInstancesRequest{Project: creds.ProjectID, Zone: zone}
-			it := instClient.List(ctx, req)
-			for {
-				inst, err := it.Next()
-				if err == iterator.Done {
-					break
-				}
-				if err != nil {
-					log.Printf("gcp compute list error: %v", err)
-					break
-				}
+		aggReq := &computepb.AggregatedListInstancesRequest{Project: creds.ProjectID}
+		it := instClient.AggregatedList(ctx, aggReq)
+		for {
+			pair, err := it.Next()
+			if err == iterator.Done {
+				break
+			}
+			if err != nil {
+				log.Printf("gcp compute aggregated list error: %v", err)
+				break
+			}
+			// pair.Key is zone/region, pair.Value.Instances is the list
+			if pair.Value == nil || pair.Value.Instances == nil {
+				continue
+			}
+			for _, inst := range pair.Value.Instances {
 				name := inst.GetName()
 				id := json.Number(inst.GetId()).String()
+				zone := inst.GetZone()
 				out = append(out, CloudResource{ID: id, Name: name, Type: "GCE", Provider: "gcp", Region: zone, Status: inst.GetStatus()})
 			}
 		}
