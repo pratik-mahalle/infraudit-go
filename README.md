@@ -1,3 +1,3 @@
-# InfraAudit Go Backend (Scaffold)
+# InfraAudit Go Backend 
 
-This is the Go backend for the InfraAudit
+This is the Go backend for the InfraAudit!

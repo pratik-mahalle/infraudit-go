@@ -235,6 +235,23 @@ func main() {
 	r.Post("/api/scan/run", handleRunScan)
 	r.Get("/api/scan/status", handleScanStatus)
 	r.Get("/api/dashboard/overview", handleDashboardOverview)
+	r.Post("/api/dashboard/refresh", handleRefreshDashboard)
+	r.Post("/api/dashboard/export", handleExportDashboard)
+	r.Post("/api/dashboard/widgets", handleAddWidget)
+	r.Get("/api/dashboard/widgets", handleListWidgets)
+	r.Delete("/api/dashboard/widgets/{id}", handleDeleteWidget)
+
+	// Cloud provider configuration
+	r.Post("/api/dashboard/configure-providers", handleConfigureProviders)
+
+	// Dashboard filters and analysis
+	r.Get("/api/dashboard/cost-analysis/periods", handleCostAnalysisPeriods)
+	r.Post("/api/dashboard/anomalies/toggle", handleToggleAnomalies)
+	r.Post("/api/dashboard/compare-periods", handleComparePeriods)
+
+	// Missing dashboard endpoints
+	r.Get("/api/alerts", handleAlerts)
+	r.Get("/api/recommendations", handleRecommendations)
 
 	// AI analysis and recommendations
 	r.Post("/api/ai-analysis/analyze/cost/{resourceId}", handleAICostAnalysis)
@@ -751,6 +768,295 @@ func handleDashboardOverview(w http.ResponseWriter, r *http.Request) {
 		"lastScan":       currentScan,
 	}
 	writeJSON(w, http.StatusOK, out)
+}
+
+// Dashboard management endpoints
+func handleRefreshDashboard(w http.ResponseWriter, r *http.Request) {
+	// Trigger a fresh scan and return updated overview
+	stateMu.Lock()
+	if currentScan.Running {
+		stateMu.Unlock()
+		writeJSON(w, http.StatusConflict, map[string]string{"message": "scan already running"})
+		return
+	}
+	stateMu.Unlock()
+
+	// Start a new scan
+	handleRunScan(w, r)
+}
+
+func handleExportDashboard(w http.ResponseWriter, r *http.Request) {
+	stateMu.Lock()
+	defer stateMu.Unlock()
+
+	// Check if PDF format is requested
+	format := r.URL.Query().Get("format")
+
+	export := map[string]any{
+		"timestamp": time.Now().Format(time.RFC3339),
+		"resources": resources,
+		"providers": map[string]bool{
+			"aws":   providers["aws"].IsConnected,
+			"gcp":   providers["gcp"].IsConnected,
+			"azure": providers["azure"].IsConnected,
+		},
+		"lastScan": currentScan,
+		"summary": map[string]any{
+			"totalResources": len(resources),
+			"providerCounts": func() map[string]int {
+				counts := map[string]int{}
+				for _, r := range resources {
+					counts[r.Provider]++
+				}
+				return counts
+			}(),
+		},
+	}
+
+	if format == "pdf" {
+		// For PDF export, set appropriate headers and return a simple PDF indicator
+		w.Header().Set("Content-Type", "application/pdf")
+		w.Header().Set("Content-Disposition", "attachment; filename=dashboard-export.pdf")
+
+		// In a real implementation, you'd generate actual PDF content
+		// For now, return a mock PDF response
+		pdfContent := "PDF export functionality - Dashboard data exported on " + time.Now().Format("2006-01-02 15:04:05")
+		w.Write([]byte(pdfContent))
+		return
+	}
+
+	// Default JSON export
+	w.Header().Set("Content-Disposition", "attachment; filename=dashboard-export.json")
+	writeJSON(w, http.StatusOK, export)
+}
+
+type Widget struct {
+	ID       string         `json:"id"`
+	Type     string         `json:"type"`
+	Title    string         `json:"title"`
+	Config   map[string]any `json:"config"`
+	Position map[string]int `json:"position"`
+}
+
+var dashboardWidgets = []Widget{}
+
+func handleAddWidget(w http.ResponseWriter, r *http.Request) {
+	var widget Widget
+	if err := json.NewDecoder(r.Body).Decode(&widget); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"message": "invalid widget data"})
+		return
+	}
+
+	widget.ID = "widget-" + randID()
+	dashboardWidgets = append(dashboardWidgets, widget)
+	writeJSON(w, http.StatusCreated, widget)
+}
+
+func handleListWidgets(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, dashboardWidgets)
+}
+
+func handleDeleteWidget(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	for i, widget := range dashboardWidgets {
+		if widget.ID == id {
+			dashboardWidgets = append(dashboardWidgets[:i], dashboardWidgets[i+1:]...)
+			writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
+			return
+		}
+	}
+	writeJSON(w, http.StatusNotFound, map[string]string{"message": "widget not found"})
+}
+
+func handleConfigureProviders(w http.ResponseWriter, r *http.Request) {
+	type providerConfig struct {
+		Provider string            `json:"provider"`
+		Enabled  bool              `json:"enabled"`
+		Config   map[string]string `json:"config"`
+	}
+
+	var configs []providerConfig
+	if err := json.NewDecoder(r.Body).Decode(&configs); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"message": "invalid config data"})
+		return
+	}
+
+	stateMu.Lock()
+	defer stateMu.Unlock()
+
+	for _, config := range configs {
+		if p, exists := providers[config.Provider]; exists {
+			if !config.Enabled {
+				p.IsConnected = false
+			}
+			// In a real implementation, you'd update credentials here
+		}
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "configured"})
+}
+
+// Additional dashboard endpoints
+func handleCostAnalysisPeriods(w http.ResponseWriter, r *http.Request) {
+	// Return available time periods for cost analysis
+	periods := []map[string]any{
+		{"id": "7d", "name": "Last 7 days", "days": 7},
+		{"id": "30d", "name": "Last 30 days", "days": 30},
+		{"id": "90d", "name": "Last 90 days", "days": 90},
+		{"id": "1y", "name": "Last year", "days": 365},
+	}
+	writeJSON(w, http.StatusOK, periods)
+}
+
+func handleToggleAnomalies(w http.ResponseWriter, r *http.Request) {
+	type toggleRequest struct {
+		Show bool `json:"show"`
+	}
+	var req toggleRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"message": "invalid request"})
+		return
+	}
+
+	// In a real implementation, this would update user preferences
+	writeJSON(w, http.StatusOK, map[string]any{
+		"anomaliesVisible": req.Show,
+		"status":           "updated",
+	})
+}
+
+func handleComparePeriods(w http.ResponseWriter, r *http.Request) {
+	type compareRequest struct {
+		Period1 string `json:"period1"`
+		Period2 string `json:"period2"`
+	}
+	var req compareRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"message": "invalid request"})
+		return
+	}
+
+	// Mock comparison data
+	comparison := map[string]any{
+		"period1": map[string]any{
+			"name":      req.Period1,
+			"totalCost": 1250.75,
+			"topServices": []map[string]any{
+				{"name": "EC2", "cost": 450.25},
+				{"name": "S3", "cost": 320.50},
+			},
+		},
+		"period2": map[string]any{
+			"name":      req.Period2,
+			"totalCost": 980.25,
+			"topServices": []map[string]any{
+				{"name": "EC2", "cost": 380.15},
+				{"name": "S3", "cost": 280.10},
+			},
+		},
+		"difference": map[string]any{
+			"amount":     270.50,
+			"percentage": 27.6,
+			"trend":      "increase",
+		},
+	}
+
+	writeJSON(w, http.StatusOK, comparison)
+}
+
+// Missing dashboard endpoints
+func handleAlerts(w http.ResponseWriter, r *http.Request) {
+	// Generate mock alerts data
+	alerts := []map[string]any{
+		{
+			"id":          "alert-" + randID(),
+			"type":        "cost",
+			"severity":    "high",
+			"title":       "High cost spike detected",
+			"description": "EC2 costs increased by 150% in the last 24 hours",
+			"timestamp":   time.Now().AddDate(0, 0, -1).Format(time.RFC3339),
+			"status":      "active",
+			"resource":    "i-" + randID(),
+		},
+		{
+			"id":          "alert-" + randID(),
+			"type":        "security",
+			"severity":    "medium",
+			"title":       "Security group misconfiguration",
+			"description": "Security group allows unrestricted access from 0.0.0.0/0",
+			"timestamp":   time.Now().AddDate(0, 0, -2).Format(time.RFC3339),
+			"status":      "active",
+			"resource":    "sg-" + randID(),
+		},
+		{
+			"id":          "alert-" + randID(),
+			"type":        "performance",
+			"severity":    "low",
+			"title":       "Underutilized resource",
+			"description": "RDS instance showing low CPU utilization for 7 days",
+			"timestamp":   time.Now().AddDate(0, 0, -3).Format(time.RFC3339),
+			"status":      "acknowledged",
+			"resource":    "db-" + randID(),
+		},
+	}
+
+	writeJSON(w, http.StatusOK, alerts)
+}
+
+func handleRecommendations(w http.ResponseWriter, r *http.Request) {
+	// Generate mock recommendations data
+	recommendations := []map[string]any{
+		{
+			"id":          "rec-" + randID(),
+			"type":        "cost-optimization",
+			"priority":    "high",
+			"title":       "Right-size EC2 instances",
+			"description": "Reduce instance types for underutilized resources to save 30% on compute costs",
+			"savings":     450.75,
+			"effort":      "medium",
+			"impact":      "high",
+			"category":    "compute",
+			"resources":   []string{"i-" + randID(), "i-" + randID()},
+		},
+		{
+			"id":          "rec-" + randID(),
+			"type":        "security",
+			"priority":    "high",
+			"title":       "Enable MFA for root accounts",
+			"description": "Multi-factor authentication is not enabled for AWS root accounts",
+			"savings":     0,
+			"effort":      "low",
+			"impact":      "high",
+			"category":    "security",
+			"resources":   []string{"account-root"},
+		},
+		{
+			"id":          "rec-" + randID(),
+			"type":        "cost-optimization",
+			"priority":    "medium",
+			"title":       "Use Reserved Instances",
+			"description": "Purchase Reserved Instances for consistent workloads to save up to 72%",
+			"savings":     1200.50,
+			"effort":      "low",
+			"impact":      "medium",
+			"category":    "compute",
+			"resources":   []string{"i-" + randID(), "i-" + randID(), "i-" + randID()},
+		},
+		{
+			"id":          "rec-" + randID(),
+			"type":        "performance",
+			"priority":    "medium",
+			"title":       "Enable auto-scaling",
+			"description": "Configure auto-scaling groups to handle traffic spikes efficiently",
+			"savings":     200.25,
+			"effort":      "medium",
+			"impact":      "medium",
+			"category":    "compute",
+			"resources":   []string{"asg-" + randID()},
+		},
+	}
+
+	writeJSON(w, http.StatusOK, recommendations)
 }
 
 func env(key, def string) string {
