@@ -2,4 +2,4 @@ api
 
 backend-go.code-workspace
 
-.env.example
+.env
