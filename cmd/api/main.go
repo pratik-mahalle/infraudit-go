@@ -7,9 +7,11 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 
+	"infraaudit/backend/internal/db"
 	"infraaudit/backend/internal/services"
 
 	"github.com/go-chi/chi/v5"
@@ -85,6 +87,14 @@ type CloudResource struct {
 func main() {
 	r := chi.NewRouter()
 
+	// Initialize DB (file path via env DB_PATH, default to data.db)
+	dbPath := env("DB_PATH", "data.db")
+	repo, err := db.Open(dbPath)
+	if err != nil {
+		log.Fatalf("failed opening db: %v", err)
+	}
+	defer repo.Close()
+
 	initOAuth()
 
 	frontend := env("FRONTEND_URL", "http://localhost:5173")
@@ -120,6 +130,7 @@ func main() {
 			return
 		}
 		user := demoUser(c.Email)
+		_, _ = mintAndSetTokens(w, user.ID, user.Email)
 		writeJSON(w, http.StatusOK, user)
 	})
 	// Alias to support frontend variants
@@ -130,6 +141,7 @@ func main() {
 			return
 		}
 		user := demoUser(c.Email)
+		_, _ = mintAndSetTokens(w, user.ID, user.Email)
 		writeJSON(w, http.StatusOK, user)
 	})
 	// Additional aliases commonly used by frontends
@@ -140,6 +152,7 @@ func main() {
 			return
 		}
 		user := demoUser(c.Email)
+		_, _ = mintAndSetTokens(w, user.ID, user.Email)
 		writeJSON(w, http.StatusOK, user)
 	})
 	r.Post("/api/v1/login", func(w http.ResponseWriter, r *http.Request) {
@@ -149,6 +162,7 @@ func main() {
 			return
 		}
 		user := demoUser(c.Email)
+		_, _ = mintAndSetTokens(w, user.ID, user.Email)
 		writeJSON(w, http.StatusOK, user)
 	})
 	r.Post("/api/v1/auth/login", func(w http.ResponseWriter, r *http.Request) {
@@ -158,6 +172,7 @@ func main() {
 			return
 		}
 		user := demoUser(c.Email)
+		_, _ = mintAndSetTokens(w, user.ID, user.Email)
 		writeJSON(w, http.StatusOK, user)
 	})
 
@@ -169,16 +184,21 @@ func main() {
 		}
 		user := demoUser(d.Email)
 		user.Username = d.Username
+		_, _ = mintAndSetTokens(w, user.ID, user.Email)
 		writeJSON(w, http.StatusCreated, user)
 	})
 
 	r.Post("/api/logout", func(w http.ResponseWriter, r *http.Request) {
+		clearAuthCookies(w)
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
 
-	r.Get("/api/user", func(w http.ResponseWriter, r *http.Request) {
-		// In real impl, verify JWT/cookie and fetch user
+	r.With(requireAuth).Get("/api/user", func(w http.ResponseWriter, r *http.Request) {
+		c := claimsFromContext(r.Context())
 		email := env("DEMO_USER_EMAIL", "demo@example.com")
+		if c != nil && c.Email != "" {
+			email = c.Email
+		}
 		writeJSON(w, http.StatusOK, demoUser(email))
 	})
 
@@ -209,16 +229,81 @@ func main() {
 		oauthCallbackHandler(p)(w, r)
 	})
 
-	// Cloud Providers API
-	r.Get("/api/cloud-providers", handleListProviders)
-	r.Post("/api/cloud-providers/aws", handleConnect("aws"))
-	r.Post("/api/cloud-providers/gcp", handleConnect("gcp"))
-	r.Post("/api/cloud-providers/azure", handleConnect("azure"))
-	r.Post("/api/cloud-providers/{id}/sync", handleSyncProvider)
-	r.Delete("/api/cloud-providers/{id}", handleDisconnect)
+	// Cloud Providers API (persisted)
+	r.Get("/api/cloud-providers", func(w http.ResponseWriter, r *http.Request) {
+		uid := int64(1)
+		rows, err := repo.GetProviderAccounts(r.Context(), uid)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"message": "db error"})
+			return
+		}
+		list := []*CloudProviderAccount{}
+		for _, p := range rows {
+			var ls *time.Time
+			if p.LastSynced.Valid {
+				v := p.LastSynced.Time
+				ls = &v
+			}
+			list = append(list, &CloudProviderAccount{
+				ID:                    p.Provider,
+				Name:                  map[string]string{"aws": "Amazon Web Services", "gcp": "Google Cloud Platform", "azure": "Microsoft Azure"}[p.Provider],
+				IsConnected:           p.IsConnected,
+				LastSynced:            ls,
+				AWSAccessKeyID:        p.AWSAccessKeyID,
+				AWSSecretAccessKey:    p.AWSSecretAccessKey,
+				AWSRegion:             p.AWSRegion,
+				GCPProjectID:          p.GCPProjectID,
+				GCPServiceAccountJSON: p.GCPServiceAccount,
+				GCPRegion:             p.GCPRegion,
+				AzureTenantID:         p.AzureTenantID,
+				AzureClientID:         p.AzureClientID,
+				AzureClientSecret:     p.AzureClientSecret,
+				AzureSubscriptionID:   p.AzureSubscriptionID,
+				AzureLocation:         p.AzureLocation,
+			})
+		}
+		writeJSON(w, http.StatusOK, list)
+	})
+	r.Post("/api/cloud-providers/aws", connectHandler(repo, "aws"))
+	r.Post("/api/cloud-providers/gcp", connectHandler(repo, "gcp"))
+	r.Post("/api/cloud-providers/azure", connectHandler(repo, "azure"))
+	r.Post("/api/cloud-providers/{id}/sync", syncHandler(repo))
+	r.Delete("/api/cloud-providers/{id}", disconnectHandler(repo))
 
-	// Cloud Resources API
-	r.Get("/api/cloud-resources", handleListResources)
+	// Cloud Resources API (persisted + pagination)
+	r.Get("/api/cloud-resources", func(w http.ResponseWriter, r *http.Request) {
+		uid := int64(1)
+		provider := r.URL.Query().Get("provider")
+		pageSize := 50
+		page := 1
+		if v := r.URL.Query().Get("pageSize"); v != "" {
+			if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 500 {
+				pageSize = n
+			}
+		}
+		if v := r.URL.Query().Get("page"); v != "" {
+			if n, err := strconv.Atoi(v); err == nil && n > 0 {
+				page = n
+			}
+		}
+		offset := (page - 1) * pageSize
+		rows, total, err := repo.ListResourcesPage(r.Context(), uid, provider, pageSize, offset)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"message": "db error"})
+			return
+		}
+		list := make([]CloudResource, 0, len(rows))
+		for _, rr := range rows {
+			list = append(list, CloudResource{ID: rr.ResourceID, Name: rr.Name, Type: rr.Type, Provider: rr.Provider, Region: rr.Region, Status: rr.Status})
+		}
+		writeJSON(w, http.StatusOK, map[string]any{
+			"items":    list,
+			"total":    total,
+			"page":     page,
+			"pageSize": pageSize,
+			"provider": provider,
+		})
+	})
 
 	// Analytics & detections
 	r.Get("/api/cost-analysis", handleCostAnalysis)
@@ -427,29 +512,60 @@ func handleListResources(w http.ResponseWriter, r *http.Request) {
 // ---- Analytics & Detection stubs ----
 // Cost analysis returns a simple time series grouped by day
 func handleCostAnalysis(w http.ResponseWriter, r *http.Request) {
-	// Generate 30-day mock cost data with mild variance
+	// Period and basic filters (parity with Node)
 	type point struct {
 		Date    string  `json:"date"`
 		Amount  float64 `json:"amount"`
 		Service string  `json:"service"`
 		Region  string  `json:"region"`
 	}
+	q := r.URL.Query()
+	period := q.Get("period") // 7d, 30d, 90d, 1y
+	days := 30
+	switch period {
+	case "7d":
+		days = 7
+	case "30d", "":
+		days = 30
+	case "90d":
+		days = 90
+	case "1y":
+		days = 365
+	}
+	if v := q.Get("days"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 3650 {
+			days = n
+		}
+	}
+	filterService := q.Get("service")
+	filterRegion := q.Get("region")
+
 	end := time.Now()
-	start := end.AddDate(0, 0, -30)
+	start := end.AddDate(0, 0, -days)
 	var out []point
 	services := []string{"EC2", "S3", "RDS", "EKS", "Lambda"}
 	regions := []string{"us-east-1", "us-west-2", "eu-west-1"}
 	for d := start; !d.After(end); d = d.Add(24 * time.Hour) {
 		for i := 0; i < 3; i++ {
+			svc := services[rand.Intn(len(services))]
+			reg := regions[rand.Intn(len(regions))]
+			if filterService != "" && filterService != svc {
+				continue
+			}
+			if filterRegion != "" && filterRegion != reg {
+				continue
+			}
 			amt := 20 + rand.Float64()*50
-			// add occasional spike
-			if rand.Intn(20) == 0 {
+			if rand.Intn(20) == 0 { // occasional spike
 				amt *= 3
 			}
-			out = append(out, point{Date: d.Format("2006-01-02"), Amount: amt, Service: services[rand.Intn(len(services))], Region: regions[rand.Intn(len(regions))]})
+			out = append(out, point{Date: d.Format("2006-01-02"), Amount: amt, Service: svc, Region: reg})
 		}
 	}
-	writeJSON(w, http.StatusOK, out)
+	writeJSON(w, http.StatusOK, map[string]any{
+		"period": map[string]any{"days": days},
+		"points": out,
+	})
 }
 
 // Cost anomalies flags spikes over a threshold
@@ -465,10 +581,18 @@ func handleCostAnomalies(w http.ResponseWriter, r *http.Request) {
 		DetectedAt   string `json:"detectedAt"`
 		Status       string `json:"status"`
 	}
+	// Optional filters: provider, severity
+	q := r.URL.Query()
+	filterProvider := q.Get("provider")
+	filterSeverity := q.Get("severity")
+
 	stateMu.Lock()
 	defer stateMu.Unlock()
 	out := []anomaly{}
 	for _, r := range resources {
+		if filterProvider != "" && r.Provider != filterProvider {
+			continue
+		}
 		// Randomly assign some anomalies
 		if rand.Intn(6) == 0 {
 			prev := 100 + rand.Intn(200)
@@ -478,6 +602,9 @@ func handleCostAnomalies(w http.ResponseWriter, r *http.Request) {
 			if pct > 120 {
 				sev = "high"
 			}
+			if filterSeverity != "" && filterSeverity != sev {
+				continue
+			}
 			out = append(out, anomaly{
 				ID: "an-" + randID(), ResourceID: r.ID, AnomalyType: "spike", Severity: sev,
 				Percentage: pct, PreviousCost: prev, CurrentCost: curr,
@@ -485,7 +612,11 @@ func handleCostAnomalies(w http.ResponseWriter, r *http.Request) {
 			})
 		}
 	}
-	writeJSON(w, http.StatusOK, out)
+	writeJSON(w, http.StatusOK, map[string]any{
+		"items":    out,
+		"total":    len(out),
+		"provider": filterProvider,
+	})
 }
 
 // Security drifts flags config changes or risky settings

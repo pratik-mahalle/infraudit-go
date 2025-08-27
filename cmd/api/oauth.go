@@ -93,7 +93,8 @@ func oauthCallbackHandler(provider string) http.HandlerFunc {
 			return
 		}
 		_ = tok
-		// In real impl: fetch userinfo, create/link user, mint refresh cookie
+		// In real impl: fetch userinfo; for now mint demo JWT and redirect
+		_, _ = mintAndSetTokens(w, 1, "demo@example.com")
 		frontendURL := env("FRONTEND_URL", "http://localhost:5173")
 		http.Redirect(w, r, frontendURL+"/dashboard", http.StatusFound)
 	}

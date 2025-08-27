@@ -1,0 +1,22 @@
+# VCS
+.git
+
+# Editor
+.vscode
+.idea
+
+# Go build artifacts
+bin/
+*.test
+
+# OS files
+.DS_Store
+
+# Local data
+/data/
+.env
+.env.*
+
+# Node leftovers (from old repo)
+node_modules/
+*.log
