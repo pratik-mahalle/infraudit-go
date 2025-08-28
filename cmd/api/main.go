@@ -264,11 +264,11 @@ func main() {
 		}
 		writeJSON(w, http.StatusOK, list)
 	})
-	r.Post("/api/cloud-providers/aws", connectHandler(repo, "aws"))
-	r.Post("/api/cloud-providers/gcp", connectHandler(repo, "gcp"))
-	r.Post("/api/cloud-providers/azure", connectHandler(repo, "azure"))
-	r.Post("/api/cloud-providers/{id}/sync", syncHandler(repo))
-	r.Delete("/api/cloud-providers/{id}", disconnectHandler(repo))
+	r.With(requireAuth, adminOnly).Post("/api/cloud-providers/aws", connectHandler(repo, "aws"))
+	r.With(requireAuth, adminOnly).Post("/api/cloud-providers/gcp", connectHandler(repo, "gcp"))
+	r.With(requireAuth, adminOnly).Post("/api/cloud-providers/azure", connectHandler(repo, "azure"))
+	r.With(requireAuth).Post("/api/cloud-providers/{id}/sync", syncHandler(repo))
+	r.With(requireAuth, adminOnly).Delete("/api/cloud-providers/{id}", disconnectHandler(repo))
 
 	// Cloud Resources API (persisted + pagination)
 	r.Get("/api/cloud-resources", func(w http.ResponseWriter, r *http.Request) {
@@ -305,6 +305,100 @@ func main() {
 		})
 	})
 
+	// Create resource (admin only)
+	r.With(requireAuth, adminOnly).Post("/api/resources", func(w http.ResponseWriter, r *http.Request) {
+		uid := int64(1)
+		var p struct{ ID, Name, Type, Provider, Region, Status string }
+		if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"message": "invalid body"})
+			return
+		}
+		if p.ID == "" || p.Provider == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"message": "missing id/provider"})
+			return
+		}
+		if err := repo.UpsertResource(r.Context(), uid, db.ResourceRow{Provider: p.Provider, ResourceID: p.ID, Name: p.Name, Type: p.Type, Region: p.Region, Status: p.Status}); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"message": "db error"})
+			return
+		}
+		rr, ok, _ := repo.GetResourceByID(r.Context(), uid, p.ID)
+		if !ok {
+			writeJSON(w, http.StatusCreated, map[string]string{"status": "created"})
+			return
+		}
+		writeJSON(w, http.StatusCreated, CloudResource{ID: rr.ResourceID, Name: rr.Name, Type: rr.Type, Provider: rr.Provider, Region: rr.Region, Status: rr.Status})
+	})
+
+	// Update resource requires auth
+	r.With(requireAuth).Patch("/api/resources/{id}", func(w http.ResponseWriter, r *http.Request) {
+		uid := int64(1)
+		id := chi.URLParam(r, "id")
+		type payload struct {
+			Name   *string `json:"name"`
+			Type   *string `json:"type"`
+			Region *string `json:"region"`
+			Status *string `json:"status"`
+		}
+		var p payload
+		if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"message": "invalid body"})
+			return
+		}
+		if err := repo.UpdateResource(r.Context(), uid, id, p.Name, p.Type, p.Region, p.Status); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"message": "db error"})
+			return
+		}
+		rr, ok, err := repo.GetResourceByID(r.Context(), uid, id)
+		if err != nil || !ok {
+			writeJSON(w, http.StatusOK, map[string]string{"status": "updated"})
+			return
+		}
+		writeJSON(w, http.StatusOK, CloudResource{ID: rr.ResourceID, Name: rr.Name, Type: rr.Type, Provider: rr.Provider, Region: rr.Region, Status: rr.Status})
+	})
+
+	// Resource by id (string id from CloudResource.ID)
+	r.Get("/api/resources/{id}", func(w http.ResponseWriter, r *http.Request) {
+		uid := int64(1)
+		id := chi.URLParam(r, "id")
+		rr, ok, err := repo.GetResourceByID(r.Context(), uid, id)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"message": "db error"})
+			return
+		}
+		if !ok {
+			writeJSON(w, http.StatusNotFound, map[string]string{"message": "resource not found"})
+			return
+		}
+		writeJSON(w, http.StatusOK, CloudResource{ID: rr.ResourceID, Name: rr.Name, Type: rr.Type, Provider: rr.Provider, Region: rr.Region, Status: rr.Status})
+	})
+
+	// Update resource metadata (name/type/region/status)
+	r.Patch("/api/resources/{id}", func(w http.ResponseWriter, r *http.Request) {
+		uid := int64(1)
+		id := chi.URLParam(r, "id")
+		type payload struct {
+			Name   *string `json:"name"`
+			Type   *string `json:"type"`
+			Region *string `json:"region"`
+			Status *string `json:"status"`
+		}
+		var p payload
+		if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"message": "invalid body"})
+			return
+		}
+		if err := repo.UpdateResource(r.Context(), uid, id, p.Name, p.Type, p.Region, p.Status); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"message": "db error"})
+			return
+		}
+		rr, ok, err := repo.GetResourceByID(r.Context(), uid, id)
+		if err != nil || !ok {
+			writeJSON(w, http.StatusOK, map[string]string{"status": "updated"})
+			return
+		}
+		writeJSON(w, http.StatusOK, CloudResource{ID: rr.ResourceID, Name: rr.Name, Type: rr.Type, Provider: rr.Provider, Region: rr.Region, Status: rr.Status})
+	})
+
 	// Analytics & detections
 	r.Get("/api/cost-analysis", handleCostAnalysis)
 	r.Get("/api/cost-anomalies", handleCostAnomalies)
@@ -335,8 +429,274 @@ func main() {
 	r.Post("/api/dashboard/compare-periods", handleComparePeriods)
 
 	// Missing dashboard endpoints
-	r.Get("/api/alerts", handleAlerts)
-	r.Get("/api/recommendations", handleRecommendations)
+	r.Get("/api/alerts", func(w http.ResponseWriter, r *http.Request) {
+		uid := int64(1)
+		typ := r.URL.Query().Get("type")
+		sev := r.URL.Query().Get("severity")
+		rows, err := repo.ListAlerts(r.Context(), uid, typ, sev)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"message": "db error"})
+			return
+		}
+		writeJSON(w, http.StatusOK, rows)
+	})
+	r.Get("/api/alerts/{id}", func(w http.ResponseWriter, r *http.Request) {
+		uid := int64(1)
+		idStr := chi.URLParam(r, "id")
+		id, _ := strconv.ParseInt(idStr, 10, 64)
+		row, ok, err := repo.GetAlertByID(r.Context(), uid, id)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"message": "db error"})
+			return
+		}
+		if !ok {
+			writeJSON(w, http.StatusNotFound, map[string]string{"message": "not found"})
+			return
+		}
+		writeJSON(w, http.StatusOK, row)
+	})
+	r.Post("/api/alerts", func(w http.ResponseWriter, r *http.Request) {
+		uid := int64(1)
+		var p struct {
+			Type        string `json:"type"`
+			Severity    string `json:"severity"`
+			Title       string `json:"title"`
+			Description string `json:"description"`
+			Resource    string `json:"resource"`
+			Status      string `json:"status"`
+			Timestamp   string `json:"timestamp"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"message": "invalid body"})
+			return
+		}
+		id, err := repo.CreateAlert(r.Context(), db.AlertRow{UserID: uid, Type: p.Type, Severity: p.Severity, Title: p.Title, Description: p.Description, Resource: p.Resource, Status: p.Status, Timestamp: p.Timestamp})
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"message": "db error"})
+			return
+		}
+		row, _, _ := repo.GetAlertByID(r.Context(), uid, id)
+		writeJSON(w, http.StatusCreated, row)
+	})
+	r.Patch("/api/alerts/{id}", func(w http.ResponseWriter, r *http.Request) {
+		uid := int64(1)
+		idStr := chi.URLParam(r, "id")
+		id, _ := strconv.ParseInt(idStr, 10, 64)
+		var p struct{ Type, Severity, Title, Description, Resource, Status, Timestamp *string }
+		if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"message": "invalid body"})
+			return
+		}
+		if err := repo.UpdateAlert(r.Context(), uid, id, p.Type, p.Severity, p.Title, p.Description, p.Resource, p.Status, p.Timestamp); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"message": "db error"})
+			return
+		}
+		row, ok, _ := repo.GetAlertByID(r.Context(), uid, id)
+		if !ok {
+			writeJSON(w, http.StatusOK, map[string]string{"status": "updated"})
+			return
+		}
+		writeJSON(w, http.StatusOK, row)
+	})
+
+	r.Get("/api/recommendations", func(w http.ResponseWriter, r *http.Request) {
+		uid := int64(1)
+		typ := r.URL.Query().Get("type")
+		rows, err := repo.ListRecommendations(r.Context(), uid, typ)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"message": "db error"})
+			return
+		}
+		writeJSON(w, http.StatusOK, rows)
+	})
+
+	// Security drifts CRUD
+	r.Get("/api/security-drifts", func(w http.ResponseWriter, r *http.Request) {
+		uid := int64(1)
+		resID := r.URL.Query().Get("resourceId")
+		sev := r.URL.Query().Get("severity")
+		rows, err := repo.ListSecurityDrifts(r.Context(), uid, resID, sev)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"message": "db error"})
+			return
+		}
+		writeJSON(w, http.StatusOK, rows)
+	})
+	r.Get("/api/security-drifts/{id}", func(w http.ResponseWriter, r *http.Request) {
+		uid := int64(1)
+		idStr := chi.URLParam(r, "id")
+		id, _ := strconv.ParseInt(idStr, 10, 64)
+		row, ok, err := repo.GetSecurityDriftByID(r.Context(), uid, id)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"message": "db error"})
+			return
+		}
+		if !ok {
+			writeJSON(w, http.StatusNotFound, map[string]string{"message": "not found"})
+			return
+		}
+		writeJSON(w, http.StatusOK, row)
+	})
+	r.Post("/api/security-drifts", func(w http.ResponseWriter, r *http.Request) {
+		uid := int64(1)
+		var p struct{ ResourceID, DriftType, Severity, Details, DetectedAt, Status string }
+		if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"message": "invalid body"})
+			return
+		}
+		id, err := repo.CreateSecurityDrift(r.Context(), db.SecurityDriftRow{UserID: uid, ResourceID: p.ResourceID, DriftType: p.DriftType, Severity: p.Severity, Details: p.Details, DetectedAt: p.DetectedAt, Status: p.Status})
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"message": "db error"})
+			return
+		}
+		row, _, _ := repo.GetSecurityDriftByID(r.Context(), uid, id)
+		writeJSON(w, http.StatusCreated, row)
+	})
+	r.Patch("/api/security-drifts/{id}", func(w http.ResponseWriter, r *http.Request) {
+		uid := int64(1)
+		idStr := chi.URLParam(r, "id")
+		id, _ := strconv.ParseInt(idStr, 10, 64)
+		var p struct{ ResourceID, DriftType, Severity, Details, DetectedAt, Status *string }
+		if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"message": "invalid body"})
+			return
+		}
+		if err := repo.UpdateSecurityDrift(r.Context(), uid, id, p.ResourceID, p.DriftType, p.Severity, p.Details, p.DetectedAt, p.Status); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"message": "db error"})
+			return
+		}
+		row, ok, _ := repo.GetSecurityDriftByID(r.Context(), uid, id)
+		if !ok {
+			writeJSON(w, http.StatusOK, map[string]string{"status": "updated"})
+			return
+		}
+		writeJSON(w, http.StatusOK, row)
+	})
+
+	// Cost anomalies CRUD
+	r.Get("/api/cost-anomalies", func(w http.ResponseWriter, r *http.Request) {
+		uid := int64(1)
+		resID := r.URL.Query().Get("resourceId")
+		sev := r.URL.Query().Get("severity")
+		rows, err := repo.ListCostAnomalies(r.Context(), uid, resID, sev)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"message": "db error"})
+			return
+		}
+		writeJSON(w, http.StatusOK, rows)
+	})
+	r.Get("/api/cost-anomalies/{id}", func(w http.ResponseWriter, r *http.Request) {
+		uid := int64(1)
+		idStr := chi.URLParam(r, "id")
+		id, _ := strconv.ParseInt(idStr, 10, 64)
+		row, ok, err := repo.GetCostAnomalyByID(r.Context(), uid, id)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"message": "db error"})
+			return
+		}
+		if !ok {
+			writeJSON(w, http.StatusNotFound, map[string]string{"message": "not found"})
+			return
+		}
+		writeJSON(w, http.StatusOK, row)
+	})
+	r.Post("/api/cost-anomalies", func(w http.ResponseWriter, r *http.Request) {
+		uid := int64(1)
+		var p struct {
+			ResourceID, AnomalyType, Severity, DetectedAt, Status string
+			Percentage, PreviousCost, CurrentCost                 int
+		}
+		if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"message": "invalid body"})
+			return
+		}
+		id, err := repo.CreateCostAnomaly(r.Context(), db.CostAnomalyRow{UserID: uid, ResourceID: p.ResourceID, AnomalyType: p.AnomalyType, Severity: p.Severity, Percentage: p.Percentage, PreviousCost: p.PreviousCost, CurrentCost: p.CurrentCost, DetectedAt: p.DetectedAt, Status: p.Status})
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"message": "db error"})
+			return
+		}
+		row, _, _ := repo.GetCostAnomalyByID(r.Context(), uid, id)
+		writeJSON(w, http.StatusCreated, row)
+	})
+	r.Patch("/api/cost-anomalies/{id}", func(w http.ResponseWriter, r *http.Request) {
+		uid := int64(1)
+		idStr := chi.URLParam(r, "id")
+		id, _ := strconv.ParseInt(idStr, 10, 64)
+		var p struct {
+			ResourceID, AnomalyType, Severity, DetectedAt, Status *string
+			Percentage, PreviousCost, CurrentCost                 *int
+		}
+		if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"message": "invalid body"})
+			return
+		}
+		if err := repo.UpdateCostAnomaly(r.Context(), uid, id, p.ResourceID, p.AnomalyType, p.Severity, p.DetectedAt, p.Status, p.Percentage, p.PreviousCost, p.CurrentCost); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"message": "db error"})
+			return
+		}
+		row, ok, _ := repo.GetCostAnomalyByID(r.Context(), uid, id)
+		if !ok {
+			writeJSON(w, http.StatusOK, map[string]string{"status": "updated"})
+			return
+		}
+		writeJSON(w, http.StatusOK, row)
+	})
+	r.Get("/api/recommendations/{id}", func(w http.ResponseWriter, r *http.Request) {
+		uid := int64(1)
+		idStr := chi.URLParam(r, "id")
+		id, _ := strconv.ParseInt(idStr, 10, 64)
+		row, ok, err := repo.GetRecommendationByID(r.Context(), uid, id)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"message": "db error"})
+			return
+		}
+		if !ok {
+			writeJSON(w, http.StatusNotFound, map[string]string{"message": "not found"})
+			return
+		}
+		writeJSON(w, http.StatusOK, row)
+	})
+	r.Post("/api/recommendations", func(w http.ResponseWriter, r *http.Request) {
+		uid := int64(1)
+		var p struct {
+			Type, Priority, Title, Description, Effort, Impact, Category, Resources string
+			Savings                                                                 float64
+		}
+		if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"message": "invalid body"})
+			return
+		}
+		id, err := repo.CreateRecommendation(r.Context(), db.RecommendationRow{UserID: uid, Type: p.Type, Priority: p.Priority, Title: p.Title, Description: p.Description, Savings: p.Savings, Effort: p.Effort, Impact: p.Impact, Category: p.Category, Resources: p.Resources})
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"message": "db error"})
+			return
+		}
+		row, _, _ := repo.GetRecommendationByID(r.Context(), uid, id)
+		writeJSON(w, http.StatusCreated, row)
+	})
+	r.Patch("/api/recommendations/{id}", func(w http.ResponseWriter, r *http.Request) {
+		uid := int64(1)
+		idStr := chi.URLParam(r, "id")
+		id, _ := strconv.ParseInt(idStr, 10, 64)
+		var p struct {
+			Type, Priority, Title, Description, Effort, Impact, Category, Resources *string
+			Savings                                                                 *float64
+		}
+		if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"message": "invalid body"})
+			return
+		}
+		if err := repo.UpdateRecommendation(r.Context(), uid, id, p.Type, p.Priority, p.Title, p.Description, p.Effort, p.Impact, p.Category, p.Resources, p.Savings); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"message": "db error"})
+			return
+		}
+		row, ok, _ := repo.GetRecommendationByID(r.Context(), uid, id)
+		if !ok {
+			writeJSON(w, http.StatusOK, map[string]string{"status": "updated"})
+			return
+		}
+		writeJSON(w, http.StatusOK, row)
+	})
 
 	// AI analysis and recommendations
 	r.Post("/api/ai-analysis/analyze/cost/{resourceId}", handleAICostAnalysis)
