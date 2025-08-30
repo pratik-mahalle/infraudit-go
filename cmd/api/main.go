@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"math/rand"
 	"net/http"
@@ -84,12 +85,15 @@ type CloudResource struct {
 	Status   string `json:"status"`
 }
 
+var repo *db.DB
+
 func main() {
 	r := chi.NewRouter()
 
 	// Initialize DB (file path via env DB_PATH, default to data.db)
 	dbPath := env("DB_PATH", "data.db")
-	repo, err := db.Open(dbPath)
+	var err error
+	repo, err = db.Open(dbPath)
 	if err != nil {
 		log.Fatalf("failed opening db: %v", err)
 	}
@@ -106,20 +110,46 @@ func main() {
 		MaxAge:           300,
 	}))
 	// Log all requests for debugging
+	r.Use(middleware.RequestID)
+	r.Use(middleware.RealIP)
 	r.Use(middleware.Logger)
+	r.Use(middleware.Recoverer)
 	// Friendly NotFound and MethodNotAllowed to reveal paths during integration
 	r.NotFound(func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("404 %s %s", r.Method, r.URL.Path)
-		writeJSON(w, http.StatusNotFound, map[string]string{"message": "not found"})
+		writeJSON(w, http.StatusNotFound, map[string]any{
+			"message":   "not found",
+			"method":    r.Method,
+			"path":      r.URL.Path,
+			"requestId": r.Context().Value(middleware.RequestIDKey),
+		})
 	})
 	r.MethodNotAllowed(func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("405 %s %s", r.Method, r.URL.Path)
-		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"message": "method not allowed"})
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{
+			"message":   "method not allowed",
+			"method":    r.Method,
+			"path":      r.URL.Path,
+			"requestId": r.Context().Value(middleware.RequestIDKey),
+		})
 	})
 
 	// Health
 	r.Get("/api/status", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, map[string]any{"status": "OK"})
+		writeJSON(w, http.StatusOK, map[string]any{"status": "OK", "time": time.Now().Format(time.RFC3339)})
+	})
+
+	// Liveness & Readiness
+	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	})
+	r.Get("/readyz", func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+		defer cancel()
+		if err := repo.Ping(ctx); err != nil {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "unready", "db": "down"})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"status": "ready", "db": "ok"})
 	})
 
 	// Auth stubs compatible with current frontend flows
@@ -264,11 +294,11 @@ func main() {
 		}
 		writeJSON(w, http.StatusOK, list)
 	})
-	r.With(requireAuth, adminOnly).Post("/api/cloud-providers/aws", connectHandler(repo, "aws"))
-	r.With(requireAuth, adminOnly).Post("/api/cloud-providers/gcp", connectHandler(repo, "gcp"))
-	r.With(requireAuth, adminOnly).Post("/api/cloud-providers/azure", connectHandler(repo, "azure"))
-	r.With(requireAuth).Post("/api/cloud-providers/{id}/sync", syncHandler(repo))
-	r.With(requireAuth, adminOnly).Delete("/api/cloud-providers/{id}", disconnectHandler(repo))
+	r.With(requirePlanAtLeast("pro"), adminOnly).Post("/api/cloud-providers/aws", connectHandler(repo, "aws"))
+	r.With(requirePlanAtLeast("pro"), adminOnly).Post("/api/cloud-providers/gcp", connectHandler(repo, "gcp"))
+	r.With(requirePlanAtLeast("pro"), adminOnly).Post("/api/cloud-providers/azure", connectHandler(repo, "azure"))
+	r.With(requirePlanAtLeast("pro")).Post("/api/cloud-providers/{id}/sync", syncHandler(repo))
+	r.With(requirePlanAtLeast("pro"), adminOnly).Delete("/api/cloud-providers/{id}", disconnectHandler(repo))
 
 	// Cloud Resources API (persisted + pagination)
 	r.Get("/api/cloud-resources", func(w http.ResponseWriter, r *http.Request) {
@@ -303,6 +333,88 @@ func main() {
 			"pageSize": pageSize,
 			"provider": provider,
 		})
+	})
+
+	// ---- Cost Prediction (Pro+) ----
+	r.With(requirePlanAtLeast("pro")).Get("/api/cost-prediction/history", func(w http.ResponseWriter, r *http.Request) {
+		uid := int64(1)
+		days := 90
+		if v := r.URL.Query().Get("days"); v != "" {
+			if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 3650 {
+				days = n
+			}
+		}
+		series, err := buildDailyCostSeries(r.Context(), uid, days)
+		if err != nil {
+			writeJSON(w, http.StatusPreconditionRequired, map[string]any{"message": err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, series)
+	})
+
+	r.With(requirePlanAtLeast("pro")).Post("/api/cost-prediction", func(w http.ResponseWriter, r *http.Request) {
+		uid := int64(1)
+		model := r.URL.Query().Get("model")
+		if model == "" {
+			model = "linear"
+		}
+		days := 30
+		if v := r.URL.Query().Get("days"); v != "" {
+			if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 3650 {
+				days = n
+			}
+		}
+		series, err := buildDailyCostSeries(r.Context(), uid, 60)
+		if err != nil {
+			writeJSON(w, http.StatusPreconditionRequired, map[string]any{"message": err.Error()})
+			return
+		}
+		pred, weekly, ciLow, ciHigh := predictCostLinear(series, days)
+		// Optional AI explanation
+		expl := "Predicted using linear trend over last 60 days of derived daily costs from synced resources."
+		ai := r.URL.Query().Get("explain")
+		if ai == "1" {
+			prompt := "Given a recent cost history (daily totals) and a linear-regression forecast, explain in 2-3 bullets the drivers and risks. Keep it concise and non-marketing. History points: "
+			for i, p := range series {
+				if i < 10 {
+					prompt += p.Date + ":" + strconv.FormatFloat(p.Amount, 'f', 2, 64) + ", "
+				}
+			}
+			resp := askOpenAI(r.Context(), prompt, []string{"Forecast assumes stable inventory; seasonality not modeled.", "Confidence interval reflects variance in daily costs."})
+			if len(resp) > 0 {
+				expl = resp[0]
+			}
+		}
+		writeJSON(w, http.StatusOK, map[string]any{
+			"model":              model,
+			"days":               days,
+			"predictedMonthly":   pred,
+			"confidenceInterval": map[string]any{"low": ciLow, "high": ciHigh},
+			"weeklyBreakdown":    weekly,
+			"explanation":        expl,
+		})
+	})
+
+	// Enterprise-only optimization suggestions for cost prediction UI
+	r.With(requirePlanAtLeast("enterprise")).Get("/api/cost-prediction/optimization-suggestions", func(w http.ResponseWriter, r *http.Request) {
+		uid := int64(1)
+		series, err := buildDailyCostSeries(r.Context(), uid, 30)
+		if err != nil {
+			writeJSON(w, http.StatusPreconditionRequired, map[string]any{"message": err.Error()})
+			return
+		}
+		prompt := "You are a FinOps assistant. Given this short daily cost history, propose 5 concrete optimization actions with estimated monthly savings per action and effort level. Reply as concise bullet points. History: "
+		for _, p := range series {
+			prompt += p.Date + ":" + strconv.FormatFloat(p.Amount, 'f', 2, 64) + ", "
+		}
+		sugg := askOpenAI(r.Context(), prompt, []string{
+			"Rightsize compute instances based on CPU/memory headroom.",
+			"Schedule dev/test environments to stop outside business hours.",
+			"Enable lifecycle policies to transition cold object storage.",
+			"Review idle load balancers and unattached volumes.",
+			"Prefer committed use discounts or savings plans where applicable.",
+		})
+		writeJSON(w, http.StatusOK, map[string]any{"suggestions": sugg})
 	})
 
 	// Create resource (admin only)
@@ -699,9 +811,9 @@ func main() {
 	})
 
 	// AI analysis and recommendations
-	r.Post("/api/ai-analysis/analyze/cost/{resourceId}", handleAICostAnalysis)
-	r.Post("/api/ai-analysis/analyze/security/{resourceId}", handleAISecurityAnalysis)
-	r.Post("/api/ai-analysis/recommendations/{resourceId}", handleAIRecommendations)
+	r.With(requirePlanAtLeast("enterprise")).Post("/api/ai-analysis/analyze/cost/{resourceId}", handleAICostAnalysis)
+	r.With(requirePlanAtLeast("enterprise")).Post("/api/ai-analysis/analyze/security/{resourceId}", handleAISecurityAnalysis)
+	r.With(requirePlanAtLeast("enterprise")).Post("/api/ai-analysis/recommendations/{resourceId}", handleAIRecommendations)
 
 	addr := env("API_ADDR", ":5000")
 	log.Printf("Go API serving on %s (CORS allow: %s)", addr, frontend)
@@ -872,7 +984,30 @@ func handleListResources(w http.ResponseWriter, r *http.Request) {
 // ---- Analytics & Detection stubs ----
 // Cost analysis returns a simple time series grouped by day
 func handleCostAnalysis(w http.ResponseWriter, r *http.Request) {
-	// Period and basic filters (parity with Node)
+	// Require at least one connected provider; otherwise instruct to connect
+	uid := int64(1)
+	provs, err := repo.GetProviderAccounts(r.Context(), uid)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"message": "db error"})
+		return
+	}
+	providersConnected := map[string]bool{"aws": false, "gcp": false, "azure": false}
+	anyConnected := false
+	for _, p := range provs {
+		providersConnected[p.Provider] = p.IsConnected
+		if p.IsConnected {
+			anyConnected = true
+		}
+	}
+	if !anyConnected {
+		writeJSON(w, http.StatusPreconditionRequired, map[string]any{
+			"message":            "connect a cloud provider first",
+			"providersConnected": providersConnected,
+		})
+		return
+	}
+
+	// Period and filters
 	type point struct {
 		Date    string  `json:"date"`
 		Amount  float64 `json:"amount"`
@@ -880,7 +1015,7 @@ func handleCostAnalysis(w http.ResponseWriter, r *http.Request) {
 		Region  string  `json:"region"`
 	}
 	q := r.URL.Query()
-	period := q.Get("period") // 7d, 30d, 90d, 1y
+	period := q.Get("period")
 	days := 30
 	switch period {
 	case "7d":
@@ -900,32 +1035,137 @@ func handleCostAnalysis(w http.ResponseWriter, r *http.Request) {
 	filterService := q.Get("service")
 	filterRegion := q.Get("region")
 
+	rows, err := repo.ListResources(r.Context(), uid)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"message": "db error"})
+		return
+	}
+	if len(rows) == 0 {
+		writeJSON(w, http.StatusPreconditionRequired, map[string]any{
+			"message":            "no resources found - run a sync first",
+			"providersConnected": providersConnected,
+		})
+		return
+	}
+
+	rate := map[string]float64{"EC2": 5.0, "VM": 4.5, "VMSS": 6.0, "RDS": 4.0, "EKS": 3.0, "GKE": 3.0, "AKS": 3.0, "S3": 0.05, "GCS": 0.05, "Storage": 0.08}
+
 	end := time.Now()
 	start := end.AddDate(0, 0, -days)
 	var out []point
-	services := []string{"EC2", "S3", "RDS", "EKS", "Lambda"}
-	regions := []string{"us-east-1", "us-west-2", "eu-west-1"}
 	for d := start; !d.After(end); d = d.Add(24 * time.Hour) {
-		for i := 0; i < 3; i++ {
-			svc := services[rand.Intn(len(services))]
-			reg := regions[rand.Intn(len(regions))]
+		for _, rr := range rows {
+			amt := rate[rr.Type]
+			if amt <= 0 {
+				amt = 0.02
+			}
+			svc := rr.Type
+			reg := rr.Region
 			if filterService != "" && filterService != svc {
 				continue
 			}
 			if filterRegion != "" && filterRegion != reg {
 				continue
 			}
-			amt := 20 + rand.Float64()*50
-			if rand.Intn(20) == 0 { // occasional spike
-				amt *= 3
-			}
 			out = append(out, point{Date: d.Format("2006-01-02"), Amount: amt, Service: svc, Region: reg})
 		}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"period": map[string]any{"days": days},
-		"points": out,
-	})
+	writeJSON(w, http.StatusOK, map[string]any{"period": map[string]any{"days": days}, "points": out})
+}
+
+// buildDailyCostSeries produces daily totals derived from persisted resources.
+// Returns error if no providers connected or no resources.
+type costPoint struct {
+	Date   string
+	Amount float64
+}
+
+func buildDailyCostSeries(ctx context.Context, userID int64, days int) ([]costPoint, error) {
+	provs, err := repo.GetProviderAccounts(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	any := false
+	for _, p := range provs {
+		if p.IsConnected {
+			any = true
+			break
+		}
+	}
+	if !any {
+		return nil, fmt.Errorf("connect a cloud provider first")
+	}
+	rows, err := repo.ListResources(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, fmt.Errorf("no resources found - run a sync first")
+	}
+	rate := map[string]float64{"EC2": 5.0, "VM": 4.5, "VMSS": 6.0, "RDS": 4.0, "EKS": 3.0, "GKE": 3.0, "AKS": 3.0, "S3": 0.05, "GCS": 0.05, "Storage": 0.08}
+	end := time.Now()
+	start := end.AddDate(0, 0, -days)
+	var out []costPoint
+	for d := start; !d.After(end); d = d.Add(24 * time.Hour) {
+		var total float64
+		for _, rr := range rows {
+			v := rate[rr.Type]
+			if v <= 0 {
+				v = 0.02
+			}
+			total += v
+		}
+		out = append(out, costPoint{Date: d.Format("2006-01-02"), Amount: total})
+	}
+	return out, nil
+}
+
+// predictCostLinear: simple linear regression on daily series; returns monthly sum, weekly breakdown, and naive CI.
+func predictCostLinear(series []costPoint, days int) (predictedMonthly float64, weekly []map[string]any, ciLow, ciHigh float64) {
+	n := len(series)
+	if n == 0 {
+		return 0, nil, 0, 0
+	}
+	// Fit y = a + b*x where x is day index
+	var sumX, sumY, sumXY, sumXX float64
+	for i, p := range series {
+		x := float64(i)
+		sumX += x
+		sumY += p.Amount
+		sumXY += x * p.Amount
+		sumXX += x * x
+	}
+	denom := float64(n)*sumXX - sumX*sumX
+	var a, b float64
+	if denom != 0 {
+		b = (float64(n)*sumXY - sumX*sumY) / denom
+		a = (sumY - b*sumX) / float64(n)
+	} else {
+		a = sumY / float64(n)
+	}
+	// Forecast next days
+	startIdx := float64(n)
+	var forecast []float64
+	for i := 0; i < days; i++ {
+		x := startIdx + float64(i)
+		y := a + b*x
+		if y < 0 {
+			y = 0
+		}
+		forecast = append(forecast, y)
+	}
+	// Aggregate to monthly sum and weekly buckets (approx 7-day weeks)
+	for i, v := range forecast {
+		predictedMonthly += v
+		if i%7 == 0 {
+			weekly = append(weekly, map[string]any{"week": len(weekly) + 1, "amount": 0.0})
+		}
+		weekly[len(weekly)-1]["amount"] = weekly[len(weekly)-1]["amount"].(float64) + v
+	}
+	// Naive CI: +/-10% of predicted
+	ciLow = predictedMonthly * 0.9
+	ciHigh = predictedMonthly * 1.1
+	return
 }
 
 // Cost anomalies flags spikes over a threshold

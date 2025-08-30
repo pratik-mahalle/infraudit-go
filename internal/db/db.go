@@ -31,6 +31,14 @@ func Open(path string) (*DB, error) {
 
 func (d *DB) Close() error { return d.sql.Close() }
 
+// Ping verifies a connection to the database is still alive.
+func (d *DB) Ping(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	return d.sql.PingContext(ctx)
+
+}
+
 func (d *DB) migrate() error {
 	_, err := d.sql.Exec(`
 CREATE TABLE IF NOT EXISTS users (
