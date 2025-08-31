@@ -150,6 +150,7 @@ func main() {
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ready", "db": "ok"})
+		_, _ = w.Write([]byte("ok"))
 	})
 
 	// Auth stubs compatible with current frontend flows
@@ -566,6 +567,18 @@ func main() {
 			return
 		}
 		writeJSON(w, http.StatusOK, row)
+	})
+	r.Post("/api/alerts/test", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]string{"message": "test"})
+	})
+	r.Get("/api/alerts/test", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]string{"message": "test"})
+	})
+	r.Patch("/api/alerts/test", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]string{"message": "test"})
+	})
+	r.Delete("/api/alerts/test", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]string{"message": "test"})
 	})
 	r.Post("/api/alerts", func(w http.ResponseWriter, r *http.Request) {
 		uid := int64(1)
