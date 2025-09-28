@@ -385,6 +385,12 @@ WHERE user_id=? AND resource_id=?
 	return err
 }
 
+// DeleteResource removes a resource by id for a user.
+func (d *DB) DeleteResource(ctx context.Context, userID int64, resourceID string) error {
+	_, err := d.sql.ExecContext(ctx, `DELETE FROM resources WHERE user_id=? AND resource_id=?`, userID, resourceID)
+	return err
+}
+
 // ----- Alerts -----
 
 type AlertRow struct {
@@ -451,6 +457,11 @@ func (d *DB) ListAlerts(ctx context.Context, userID int64, typ, severity string)
 func (d *DB) UpdateAlert(ctx context.Context, userID int64, id int64, typ, severity, title, description, resource, status, timestamp *string) error {
 	_, err := d.sql.ExecContext(ctx, `UPDATE alerts SET type=COALESCE(?, type), severity=COALESCE(?, severity), title=COALESCE(?, title), description=COALESCE(?, description), resource=COALESCE(?, resource), status=COALESCE(?, status), timestamp=COALESCE(?, timestamp) WHERE user_id=? AND id=?`,
 		typ, severity, title, description, resource, status, timestamp, userID, id)
+	return err
+}
+
+func (d *DB) DeleteAlert(ctx context.Context, userID int64, id int64) error {
+	_, err := d.sql.ExecContext(ctx, `DELETE FROM alerts WHERE user_id=? AND id=?`, userID, id)
 	return err
 }
 
@@ -521,6 +532,11 @@ func (d *DB) UpdateRecommendation(ctx context.Context, userID int64, id int64, t
 	return err
 }
 
+func (d *DB) DeleteRecommendation(ctx context.Context, userID int64, id int64) error {
+	_, err := d.sql.ExecContext(ctx, `DELETE FROM recommendations WHERE user_id=? AND id=?`, userID, id)
+	return err
+}
+
 // ----- Security Drifts -----
 
 type SecurityDriftRow struct {
@@ -584,6 +600,11 @@ func (d *DB) ListSecurityDrifts(ctx context.Context, userID int64, resourceID st
 func (d *DB) UpdateSecurityDrift(ctx context.Context, userID int64, id int64, resourceID, driftType, severity, details, detectedAt, status *string) error {
 	_, err := d.sql.ExecContext(ctx, `UPDATE security_drifts SET resource_id=COALESCE(?, resource_id), drift_type=COALESCE(?, drift_type), severity=COALESCE(?, severity), details=COALESCE(?, details), detected_at=COALESCE(?, detected_at), status=COALESCE(?, status) WHERE user_id=? AND id=?`,
 		resourceID, driftType, severity, details, detectedAt, status, userID, id)
+	return err
+}
+
+func (d *DB) DeleteSecurityDrift(ctx context.Context, userID int64, id int64) error {
+	_, err := d.sql.ExecContext(ctx, `DELETE FROM security_drifts WHERE user_id=? AND id=?`, userID, id)
 	return err
 }
 
@@ -652,5 +673,10 @@ func (d *DB) ListCostAnomalies(ctx context.Context, userID int64, resourceID, se
 func (d *DB) UpdateCostAnomaly(ctx context.Context, userID int64, id int64, resourceID, anomalyType, severity, detectedAt, status *string, percentage, previousCost, currentCost *int) error {
 	_, err := d.sql.ExecContext(ctx, `UPDATE cost_anomalies SET resource_id=COALESCE(?, resource_id), anomaly_type=COALESCE(?, anomaly_type), severity=COALESCE(?, severity), detected_at=COALESCE(?, detected_at), status=COALESCE(?, status), percentage=COALESCE(?, percentage), previous_cost=COALESCE(?, previous_cost), current_cost=COALESCE(?, current_cost) WHERE user_id=? AND id=?`,
 		resourceID, anomalyType, severity, detectedAt, status, percentage, previousCost, currentCost, userID, id)
+	return err
+}
+
+func (d *DB) DeleteCostAnomaly(ctx context.Context, userID int64, id int64) error {
+	_, err := d.sql.ExecContext(ctx, `DELETE FROM cost_anomalies WHERE user_id=? AND id=?`, userID, id)
 	return err
 }

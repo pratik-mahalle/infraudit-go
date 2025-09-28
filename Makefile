@@ -8,8 +8,14 @@ DOCKER_IMAGE=infraaudit-go
 build:
 	GO111MODULE=on CGO_ENABLED=0 go build -o $(BIN) ./cmd/api
 
+build-settings:
+	GO111MODULE=on CGO_ENABLED=0 go build -o bin/settings ./settings
+
 run:
-	API_ADDR=:5000 DB_PATH=./data.db go run ./cmd/api
+	API_ADDR=:8080 DB_PATH=./data.db go run ./cmd/api
+
+run-settings:
+	go run ./settings
 
 clean:
 	rm -f $(BIN)
@@ -26,9 +32,9 @@ lint:
 docker-build:
 	docker build -t $(DOCKER_IMAGE):latest .
 
-PORT?=5000
+PORT?=8080
 DATA_DIR?=$(PWD)/data
 
 docker-run:
 	mkdir -p $(DATA_DIR)
-	docker run --rm -p $(PORT):5000 -e API_ADDR=":5000" -e DB_PATH="/data/data.db" -v $(DATA_DIR):/data $(DOCKER_IMAGE):latest
+	docker run --rm -p $(PORT):8080 -e API_ADDR=":8080" -e DB_PATH="/data/data.db" -v $(DATA_DIR):/data $(DOCKER_IMAGE):latest

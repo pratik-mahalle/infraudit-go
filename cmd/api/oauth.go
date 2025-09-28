@@ -18,7 +18,7 @@ var (
 )
 
 func initOAuth() {
-	baseURL := env("API_BASE_URL", "http://localhost:5000")
+	baseURL := env("API_BASE_URL", "http://localhost:8080")
 	frontend := env("FRONTEND_URL", "http://localhost:5173")
 	_ = frontend
 

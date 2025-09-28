@@ -9,9 +9,11 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
+	"infraaudit/backend/internal/auth"
 	"infraaudit/backend/internal/db"
 	"infraaudit/backend/internal/services"
 
@@ -132,9 +134,47 @@ func main() {
 		})
 	})
 
-	// Health
+	// Health and integrations status (structured for frontend expectations)
 	r.Get("/api/status", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, map[string]any{"status": "OK", "time": time.Now().Format(time.RFC3339)})
+		ctx, cancel := context.WithTimeout(r.Context(), 1*time.Second)
+		defer cancel()
+		dbOK := repo.Ping(ctx) == nil
+		out := map[string]any{
+			"status": map[string]any{
+				"slack":  map[string]any{"configured": false},
+				"openai": map[string]any{"configured": os.Getenv("OPENAI_API_KEY") != ""},
+				"stripe": map[string]any{"configured": false},
+				"oauth": map[string]any{
+					"google": map[string]any{"configured": oauthGoogleConfig != nil},
+					"github": map[string]any{"configured": oauthGitHubConfig != nil},
+				},
+				"db": map[string]any{"ok": dbOK},
+			},
+			"time": time.Now().Format(time.RFC3339),
+			"ok":   true,
+		}
+		writeJSON(w, http.StatusOK, out)
+	})
+	// Alias used by some frontends
+	r.Get("/api/integrations/status", func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 1*time.Second)
+		defer cancel()
+		dbOK := repo.Ping(ctx) == nil
+		out := map[string]any{
+			"status": map[string]any{
+				"slack":  map[string]any{"configured": false},
+				"openai": map[string]any{"configured": os.Getenv("OPENAI_API_KEY") != ""},
+				"stripe": map[string]any{"configured": false},
+				"oauth": map[string]any{
+					"google": map[string]any{"configured": oauthGoogleConfig != nil},
+					"github": map[string]any{"configured": oauthGitHubConfig != nil},
+				},
+				"db": map[string]any{"ok": dbOK},
+			},
+			"time": time.Now().Format(time.RFC3339),
+			"ok":   true,
+		}
+		writeJSON(w, http.StatusOK, out)
 	})
 
 	// Liveness & Readiness
@@ -295,14 +335,129 @@ func main() {
 		}
 		writeJSON(w, http.StatusOK, list)
 	})
-	r.With(requirePlanAtLeast("pro"), adminOnly).Post("/api/cloud-providers/aws", connectHandler(repo, "aws"))
-	r.With(requirePlanAtLeast("pro"), adminOnly).Post("/api/cloud-providers/gcp", connectHandler(repo, "gcp"))
-	r.With(requirePlanAtLeast("pro"), adminOnly).Post("/api/cloud-providers/azure", connectHandler(repo, "azure"))
-	r.With(requirePlanAtLeast("pro")).Post("/api/cloud-providers/{id}/sync", syncHandler(repo))
-	r.With(requirePlanAtLeast("pro"), adminOnly).Delete("/api/cloud-providers/{id}", disconnectHandler(repo))
+
+	// Upsert provider account (persisted)
+	r.With(requirePlanAtLeast("pro"), adminOnly).Post("/api/provider-accounts/{provider}", func(w http.ResponseWriter, r *http.Request) {
+		uid := int64(1)
+		provider := chi.URLParam(r, "provider")
+		var body struct {
+			IsConnected         *bool   `json:"isConnected"`
+			LastSynced          *string `json:"lastSynced"`
+			AWSAccessKeyID      *string `json:"awsAccessKeyId"`
+			AWSSecretAccessKey  *string `json:"awsSecretAccessKey"`
+			AWSRegion           *string `json:"awsRegion"`
+			GCPProjectID        *string `json:"gcpProjectId"`
+			GCPServiceAccount   *string `json:"gcpServiceAccountJson"`
+			GCPRegion           *string `json:"gcpRegion"`
+			AzureTenantID       *string `json:"azureTenantId"`
+			AzureClientID       *string `json:"azureClientId"`
+			AzureClientSecret   *string `json:"azureClientSecret"`
+			AzureSubscriptionID *string `json:"azureSubscriptionId"`
+			AzureLocation       *string `json:"azureLocation"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		isConn := true
+		if body.IsConnected != nil {
+			isConn = *body.IsConnected
+		}
+		row := db.ProviderAccountRow{
+			UserID:      uid,
+			Provider:    provider,
+			IsConnected: isConn,
+		}
+		if body.AWSAccessKeyID != nil {
+			row.AWSAccessKeyID = *body.AWSAccessKeyID
+		}
+		if body.AWSSecretAccessKey != nil {
+			row.AWSSecretAccessKey = *body.AWSSecretAccessKey
+		}
+		if body.AWSRegion != nil {
+			row.AWSRegion = *body.AWSRegion
+		}
+		if body.GCPProjectID != nil {
+			row.GCPProjectID = *body.GCPProjectID
+		}
+		if body.GCPServiceAccount != nil {
+			row.GCPServiceAccount = *body.GCPServiceAccount
+		}
+		if body.GCPRegion != nil {
+			row.GCPRegion = *body.GCPRegion
+		}
+		if body.AzureTenantID != nil {
+			row.AzureTenantID = *body.AzureTenantID
+		}
+		if body.AzureClientID != nil {
+			row.AzureClientID = *body.AzureClientID
+		}
+		if body.AzureClientSecret != nil {
+			row.AzureClientSecret = *body.AzureClientSecret
+		}
+		if body.AzureSubscriptionID != nil {
+			row.AzureSubscriptionID = *body.AzureSubscriptionID
+		}
+		if body.AzureLocation != nil {
+			row.AzureLocation = *body.AzureLocation
+		}
+		if err := repo.UpsertProviderAccount(r.Context(), row); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"message": "db error"})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"status": "upserted", "provider": provider})
+	})
+
+	// Delete provider account (persisted)
+	r.With(requirePlanAtLeast("pro"), adminOnly).Delete("/api/provider-accounts/{provider}", func(w http.ResponseWriter, r *http.Request) {
+		uid := int64(1)
+		provider := chi.URLParam(r, "provider")
+		if err := repo.DeleteProviderAccount(r.Context(), uid, provider); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"message": "db error"})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
+	})
+	r.With(requirePlanAtLeast("pro"), adminOnly).Post("/api/cloud-providers/aws", handleConnect("aws"))
+	r.With(requirePlanAtLeast("pro"), adminOnly).Post("/api/cloud-providers/gcp", handleConnect("gcp"))
+	r.With(requirePlanAtLeast("pro"), adminOnly).Post("/api/cloud-providers/azure", handleConnect("azure"))
+	r.With(requirePlanAtLeast("pro")).Post("/api/cloud-providers/{id}/sync", handleSyncProvider)
+	r.With(requirePlanAtLeast("pro"), adminOnly).Delete("/api/cloud-providers/{id}", handleDisconnect)
 
 	// Cloud Resources API (persisted + pagination)
 	r.Get("/api/cloud-resources", func(w http.ResponseWriter, r *http.Request) {
+		uid := int64(1)
+		provider := r.URL.Query().Get("provider")
+		pageSize := 50
+		page := 1
+		if v := r.URL.Query().Get("pageSize"); v != "" {
+			if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 500 {
+				pageSize = n
+			}
+		}
+		if v := r.URL.Query().Get("page"); v != "" {
+			if n, err := strconv.Atoi(v); err == nil && n > 0 {
+				page = n
+			}
+		}
+		offset := (page - 1) * pageSize
+		rows, total, err := repo.ListResourcesPage(r.Context(), uid, provider, pageSize, offset)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"message": "db error"})
+			return
+		}
+		list := make([]CloudResource, 0, len(rows))
+		for _, rr := range rows {
+			list = append(list, CloudResource{ID: rr.ResourceID, Name: rr.Name, Type: rr.Type, Provider: rr.Provider, Region: rr.Region, Status: rr.Status})
+		}
+		writeJSON(w, http.StatusOK, map[string]any{
+			"items":    list,
+			"total":    total,
+			"page":     page,
+			"pageSize": pageSize,
+			"provider": provider,
+		})
+	})
+
+	// Alias: list resources with pagination using DB
+	r.Get("/api/resources", func(w http.ResponseWriter, r *http.Request) {
 		uid := int64(1)
 		provider := r.URL.Query().Get("provider")
 		pageSize := 50
@@ -512,6 +667,17 @@ func main() {
 		writeJSON(w, http.StatusOK, CloudResource{ID: rr.ResourceID, Name: rr.Name, Type: rr.Type, Provider: rr.Provider, Region: rr.Region, Status: rr.Status})
 	})
 
+	// Delete resource
+	r.With(requireAuth).Delete("/api/resources/{id}", func(w http.ResponseWriter, r *http.Request) {
+		uid := int64(1)
+		id := chi.URLParam(r, "id")
+		if err := repo.DeleteResource(r.Context(), uid, id); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"message": "db error"})
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+
 	// Analytics & detections
 	r.Get("/api/cost-analysis", handleCostAnalysis)
 	r.Get("/api/cost-anomalies", handleCostAnomalies)
@@ -552,6 +718,18 @@ func main() {
 			return
 		}
 		writeJSON(w, http.StatusOK, rows)
+	})
+
+	// Delete alert
+	r.Delete("/api/alerts/{id}", func(w http.ResponseWriter, r *http.Request) {
+		uid := int64(1)
+		idStr := chi.URLParam(r, "id")
+		id, _ := strconv.ParseInt(idStr, 10, 64)
+		if err := repo.DeleteAlert(r.Context(), uid, id); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"message": "db error"})
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
 	})
 	r.Get("/api/alerts/{id}", func(w http.ResponseWriter, r *http.Request) {
 		uid := int64(1)
@@ -635,6 +813,18 @@ func main() {
 		writeJSON(w, http.StatusOK, rows)
 	})
 
+	// Delete recommendation
+	r.Delete("/api/recommendations/{id}", func(w http.ResponseWriter, r *http.Request) {
+		uid := int64(1)
+		idStr := chi.URLParam(r, "id")
+		id, _ := strconv.ParseInt(idStr, 10, 64)
+		if err := repo.DeleteRecommendation(r.Context(), uid, id); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"message": "db error"})
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+
 	// Security drifts CRUD
 	r.Get("/api/security-drifts", func(w http.ResponseWriter, r *http.Request) {
 		uid := int64(1)
@@ -646,6 +836,18 @@ func main() {
 			return
 		}
 		writeJSON(w, http.StatusOK, rows)
+	})
+
+	// Delete security drift
+	r.Delete("/api/security-drifts/{id}", func(w http.ResponseWriter, r *http.Request) {
+		uid := int64(1)
+		idStr := chi.URLParam(r, "id")
+		id, _ := strconv.ParseInt(idStr, 10, 64)
+		if err := repo.DeleteSecurityDrift(r.Context(), uid, id); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"message": "db error"})
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
 	})
 	r.Get("/api/security-drifts/{id}", func(w http.ResponseWriter, r *http.Request) {
 		uid := int64(1)
@@ -709,6 +911,18 @@ func main() {
 			return
 		}
 		writeJSON(w, http.StatusOK, rows)
+	})
+
+	// Delete cost anomaly
+	r.Delete("/api/cost-anomalies/{id}", func(w http.ResponseWriter, r *http.Request) {
+		uid := int64(1)
+		idStr := chi.URLParam(r, "id")
+		id, _ := strconv.ParseInt(idStr, 10, 64)
+		if err := repo.DeleteCostAnomaly(r.Context(), uid, id); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"message": "db error"})
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
 	})
 	r.Get("/api/cost-anomalies/{id}", func(w http.ResponseWriter, r *http.Request) {
 		uid := int64(1)
@@ -828,7 +1042,49 @@ func main() {
 	r.With(requirePlanAtLeast("enterprise")).Post("/api/ai-analysis/analyze/security/{resourceId}", handleAISecurityAnalysis)
 	r.With(requirePlanAtLeast("enterprise")).Post("/api/ai-analysis/recommendations/{resourceId}", handleAIRecommendations)
 
-	addr := env("API_ADDR", ":5000")
+	// ---- Settings minimal routes to satisfy frontend ----
+	r.Get("/profile", func(w http.ResponseWriter, r *http.Request) {
+		email := env("DEMO_USER_EMAIL", "demo@example.com")
+		writeJSON(w, http.StatusOK, demoUser(email))
+	})
+	r.Put("/profile", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]string{"status": "updated"})
+	})
+	r.Post("/profile/avatar", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusCreated, map[string]any{"url": "https://example.com/avatar.png"})
+	})
+	r.Get("/api/profile", func(w http.ResponseWriter, r *http.Request) {
+		email := env("DEMO_USER_EMAIL", "demo@example.com")
+		writeJSON(w, http.StatusOK, demoUser(email))
+	})
+	r.Put("/api/profile", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]string{"status": "updated"})
+	})
+	r.Post("/api/profile/avatar", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusCreated, map[string]any{"url": "https://example.com/avatar.png"})
+	})
+
+	// Account settings
+	r.Get("/account/settings", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]any{"language": "en", "timezone": "UTC", "theme": "system"})
+	})
+	r.Put("/account/settings", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]string{"status": "updated"})
+	})
+	r.Post("/account/password", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]string{"status": "changed"})
+	})
+	r.Get("/api/account/settings", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]any{"language": "en", "timezone": "UTC", "theme": "system"})
+	})
+	r.Put("/api/account/settings", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]string{"status": "updated"})
+	})
+	r.Post("/api/account/password", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]string{"status": "changed"})
+	})
+
+	addr := env("API_ADDR", ":8080")
 	log.Printf("Go API serving on %s (CORS allow: %s)", addr, frontend)
 	if err := http.ListenAndServe(addr, r); err != nil {
 		log.Fatal(err)
@@ -1499,6 +1755,24 @@ func handleDashboardOverview(w http.ResponseWriter, r *http.Request) {
 		typeCounts[cr.Type]++
 		regionCounts[cr.Region]++
 	}
+	// Include resources with a simple synthetic cost for frontend aggregations
+	resourceRates := map[string]float64{"EC2": 5.0, "VM": 4.5, "VMSS": 6.0, "RDS": 4.0, "EKS": 3.0, "GKE": 3.0, "AKS": 3.0, "S3": 0.05, "GCS": 0.05, "Storage": 0.08}
+	resWithCost := make([]map[string]any, 0, len(resources))
+	for _, cr := range resources {
+		cost := resourceRates[cr.Type]
+		if cost <= 0 {
+			cost = 0.02
+		}
+		resWithCost = append(resWithCost, map[string]any{
+			"id":       cr.ID,
+			"name":     cr.Name,
+			"type":     cr.Type,
+			"provider": cr.Provider,
+			"region":   cr.Region,
+			"status":   cr.Status,
+			"cost":     cost,
+		})
+	}
 	out := map[string]any{
 		"resourcesTotal": len(resources),
 		"providersConnected": map[string]bool{
@@ -1510,6 +1784,7 @@ func handleDashboardOverview(w http.ResponseWriter, r *http.Request) {
 		"typeCounts":     typeCounts,
 		"regionCounts":   regionCounts,
 		"lastScan":       currentScan,
+		"resources":      resWithCost,
 	}
 	writeJSON(w, http.StatusOK, out)
 }
@@ -1815,6 +2090,128 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(v)
+}
+
+// ---- Auth helpers & middleware ----
+
+type contextKey string
+
+const ctxClaimsKey contextKey = "claims"
+
+func mintAndSetTokens(w http.ResponseWriter, userID int64, email string) (auth.TokenPair, error) {
+	secret := env("JWT_SECRET", "dev-secret")
+	pair, err := auth.MintTokens(userID, email, secret, 15*time.Minute, 30*24*time.Hour)
+	if err != nil {
+		return auth.TokenPair{}, err
+	}
+	secure := env("COOKIE_SECURE", "0") == "1"
+	// Access token cookie
+	http.SetCookie(w, &http.Cookie{
+		Name:     "access_token",
+		Value:    pair.AccessToken,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   secure,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   int((15 * time.Minute).Seconds()),
+	})
+	// Refresh token cookie
+	http.SetCookie(w, &http.Cookie{
+		Name:     "refresh_token",
+		Value:    pair.RefreshToken,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   secure,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   int((30 * 24 * time.Hour).Seconds()),
+	})
+	return pair, nil
+}
+
+func clearAuthCookies(w http.ResponseWriter) {
+	for _, name := range []string{"access_token", "refresh_token"} {
+		http.SetCookie(w, &http.Cookie{
+			Name:     name,
+			Value:    "",
+			Path:     "/",
+			HttpOnly: true,
+			Expires:  time.Unix(0, 0),
+			MaxAge:   -1,
+		})
+	}
+}
+
+func requireAuth(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		secret := env("JWT_SECRET", "dev-secret")
+		var token string
+		if ah := r.Header.Get("Authorization"); strings.HasPrefix(strings.ToLower(ah), "bearer ") {
+			token = strings.TrimSpace(ah[len("Bearer "):])
+		}
+		if token == "" {
+			if c, err := r.Cookie("access_token"); err == nil {
+				token = c.Value
+			}
+		}
+		if token == "" {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"message": "missing token"})
+			return
+		}
+		claims, err := auth.ParseClaims(token, secret)
+		if err != nil {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"message": "invalid token"})
+			return
+		}
+		ctx := context.WithValue(r.Context(), ctxClaimsKey, claims)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+func claimsFromContext(ctx context.Context) *auth.Claims {
+	if v := ctx.Value(ctxClaimsKey); v != nil {
+		if c, ok := v.(*auth.Claims); ok {
+			return c
+		}
+	}
+	return nil
+}
+
+func requirePlanAtLeast(minPlan string) func(http.Handler) http.Handler {
+	order := map[string]int{"free": 0, "pro": 1, "enterprise": 2}
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Demo: read plan from env, default to pro
+			plan := env("DEMO_PLAN", "pro")
+			if ae := env("ADMIN_EMAIL", ""); ae != "" {
+				if c := claimsFromContext(r.Context()); c != nil && c.Email == ae {
+					next.ServeHTTP(w, r)
+					return
+				}
+			}
+			if order[plan] < order[minPlan] {
+				writeJSON(w, http.StatusPaymentRequired, map[string]any{"message": "upgrade required", "required": minPlan, "current": plan})
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+func adminOnly(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ae := env("ADMIN_EMAIL", "")
+		if ae == "" {
+			// If not configured, allow all in demo
+			next.ServeHTTP(w, r)
+			return
+		}
+		c := claimsFromContext(r.Context())
+		if c != nil && c.Email == ae {
+			next.ServeHTTP(w, r)
+			return
+		}
+		writeJSON(w, http.StatusForbidden, map[string]string{"message": "admin only"})
+	})
 }
 
 func demoUser(email string) User {

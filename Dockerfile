@@ -20,7 +20,7 @@ FROM gcr.io/distroless/static:nonroot
 WORKDIR /
 
 # Runtime envs
-ENV API_ADDR=":5000" \
+ENV API_ADDR=":8080" \
     DB_PATH="/data/data.db"
 
 # App data dir
@@ -29,6 +29,6 @@ VOLUME ["/data"]
 
 COPY --from=builder /out/api /api
 
-EXPOSE 5000
+EXPOSE 8080
 ENTRYPOINT ["/api"]
 
