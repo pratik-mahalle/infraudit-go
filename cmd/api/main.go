@@ -88,6 +88,8 @@ type CloudResource struct {
 }
 
 var repo *db.DB
+var slackService services.SlackService
+var slackDefaultChannel string
 
 func main() {
 	r := chi.NewRouter()
@@ -102,6 +104,17 @@ func main() {
 	defer repo.Close()
 
 	initOAuth()
+
+	// Initialize Slack notifications
+	slackURL := env("SLACK_WEBHOOK_URL", "")
+	slackDefaultChannel = env("SLACK_CHANNEL", "")
+	if slackURL != "" {
+		slackService = &services.WebhookSlack{WebhookURL: slackURL}
+		log.Printf("slack webhook configured")
+	} else {
+		slackService = &services.InMemorySlack{}
+		log.Printf("slack webhook not configured; using noop")
+	}
 
 	frontend := env("FRONTEND_URL", "http://localhost:5173")
 	r.Use(cors.Handler(cors.Options{
