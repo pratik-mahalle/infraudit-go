@@ -461,11 +461,12 @@ func main() {
 			list = append(list, CloudResource{ID: rr.ResourceID, Name: rr.Name, Type: rr.Type, Provider: rr.Provider, Region: rr.Region, Status: rr.Status})
 		}
 		writeJSON(w, http.StatusOK, map[string]any{
-			"items":    list,
-			"total":    total,
-			"page":     page,
-			"pageSize": pageSize,
-			"provider": provider,
+			"items":     list,
+			"resources": list, // compatibility for UIs expecting `resources`
+			"total":     total,
+			"page":      page,
+			"pageSize":  pageSize,
+			"provider":  provider,
 		})
 	})
 
@@ -496,11 +497,12 @@ func main() {
 			list = append(list, CloudResource{ID: rr.ResourceID, Name: rr.Name, Type: rr.Type, Provider: rr.Provider, Region: rr.Region, Status: rr.Status})
 		}
 		writeJSON(w, http.StatusOK, map[string]any{
-			"items":    list,
-			"total":    total,
-			"page":     page,
-			"pageSize": pageSize,
-			"provider": provider,
+			"items":     list,
+			"resources": list, // compatibility for UIs expecting `resources`
+			"total":     total,
+			"page":      page,
+			"pageSize":  pageSize,
+			"provider":  provider,
 		})
 	})
 
@@ -1824,9 +1826,28 @@ func handleExportDashboard(w http.ResponseWriter, r *http.Request) {
 	// Check if PDF format is requested
 	format := r.URL.Query().Get("format")
 
+	// Build resources with a synthetic cost for compatibility with UIs that sum resource.cost
+	resourceRates := map[string]float64{"EC2": 5.0, "VM": 4.5, "VMSS": 6.0, "RDS": 4.0, "EKS": 3.0, "GKE": 3.0, "AKS": 3.0, "S3": 0.05, "GCS": 0.05, "Storage": 0.08}
+	resWithCost := make([]map[string]any, 0, len(resources))
+	for _, cr := range resources {
+		cost := resourceRates[cr.Type]
+		if cost <= 0 {
+			cost = 0.02
+		}
+		resWithCost = append(resWithCost, map[string]any{
+			"id":       cr.ID,
+			"name":     cr.Name,
+			"type":     cr.Type,
+			"provider": cr.Provider,
+			"region":   cr.Region,
+			"status":   cr.Status,
+			"cost":     cost,
+		})
+	}
+
 	export := map[string]any{
 		"timestamp": time.Now().Format(time.RFC3339),
-		"resources": resources,
+		"resources": resWithCost,
 		"providers": map[string]bool{
 			"aws":   providers["aws"].IsConnected,
 			"gcp":   providers["gcp"].IsConnected,
