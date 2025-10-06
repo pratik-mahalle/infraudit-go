@@ -1,15 +1,17 @@
-package main
+package providers
 
 import (
 	"context"
-	"encoding/json"
 	"log"
+	"strconv"
 
 	compute "cloud.google.com/go/compute/apiv1"
 	"cloud.google.com/go/storage"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 	computepb "google.golang.org/genproto/googleapis/cloud/compute/v1"
+
+	"infraaudit/backend/internal/services"
 )
 
 type GCPCredentials struct {
@@ -18,13 +20,13 @@ type GCPCredentials struct {
 	Region             string
 }
 
-func gcpListResources(ctx context.Context, creds GCPCredentials) ([]CloudResource, error) {
+func GCPListResources(ctx context.Context, creds GCPCredentials) ([]services.CloudResource, error) {
 	var opts []option.ClientOption
 	if creds.ServiceAccountJSON != "" {
 		opts = append(opts, option.WithCredentialsJSON([]byte(creds.ServiceAccountJSON)))
 	}
 
-	var out []CloudResource
+	var out []services.CloudResource
 
 	// Compute Engine instances across all zones via AggregatedList
 	instClient, err := compute.NewInstancesRESTClient(ctx, opts...)
@@ -41,15 +43,14 @@ func gcpListResources(ctx context.Context, creds GCPCredentials) ([]CloudResourc
 				log.Printf("gcp compute aggregated list error: %v", err)
 				break
 			}
-			// pair.Key is zone/region, pair.Value.Instances is the list
 			if pair.Value == nil || pair.Value.Instances == nil {
 				continue
 			}
 			for _, inst := range pair.Value.Instances {
 				name := inst.GetName()
-				id := json.Number(inst.GetId()).String()
+				id := strconv.FormatInt(int64(inst.GetId()), 10)
 				zone := inst.GetZone()
-				out = append(out, CloudResource{ID: id, Name: name, Type: "GCE", Provider: "gcp", Region: zone, Status: inst.GetStatus()})
+				out = append(out, services.CloudResource{ID: id, Name: name, Type: "GCE", Provider: "gcp", Region: zone, Status: inst.GetStatus()})
 			}
 		}
 	} else {
@@ -70,7 +71,7 @@ func gcpListResources(ctx context.Context, creds GCPCredentials) ([]CloudResourc
 				log.Printf("gcp storage list error: %v", err)
 				break
 			}
-			out = append(out, CloudResource{ID: "gcs-" + battrs.Name, Name: battrs.Name, Type: "GCS", Provider: "gcp", Region: battrs.Location, Status: "available"})
+			out = append(out, services.CloudResource{ID: "gcs-" + battrs.Name, Name: battrs.Name, Type: "GCS", Provider: "gcp", Region: battrs.Location, Status: "available"})
 		}
 	} else {
 		log.Printf("gcp storage client error: %v", err)

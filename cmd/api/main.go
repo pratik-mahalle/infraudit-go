@@ -15,6 +15,7 @@ import (
 
 	"infraaudit/backend/internal/auth"
 	"infraaudit/backend/internal/db"
+	providerspkg "infraaudit/backend/internal/providers"
 	"infraaudit/backend/internal/services"
 
 	"github.com/go-chi/chi/v5"
@@ -78,14 +79,7 @@ type CloudProviderAccount struct {
 	AzureLocation       string `json:"-"`
 }
 
-type CloudResource struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	Type     string `json:"type"`
-	Provider string `json:"provider"`
-	Region   string `json:"region"`
-	Status   string `json:"status"`
-}
+type CloudResource = services.CloudResource
 
 var repo *db.DB
 var slackService services.SlackService
@@ -551,7 +545,7 @@ func main() {
 					prompt += p.Date + ":" + strconv.FormatFloat(p.Amount, 'f', 2, 64) + ", "
 				}
 			}
-			resp := askOpenAI(r.Context(), prompt, []string{"Forecast assumes stable inventory; seasonality not modeled.", "Confidence interval reflects variance in daily costs."})
+			resp := providerspkg.AskOpenAI(r.Context(), prompt, []string{"Forecast assumes stable inventory; seasonality not modeled.", "Confidence interval reflects variance in daily costs."})
 			if len(resp) > 0 {
 				expl = resp[0]
 			}
@@ -578,7 +572,7 @@ func main() {
 		for _, p := range series {
 			prompt += p.Date + ":" + strconv.FormatFloat(p.Amount, 'f', 2, 64) + ", "
 		}
-		sugg := askOpenAI(r.Context(), prompt, []string{
+		sugg := providerspkg.AskOpenAI(r.Context(), prompt, []string{
 			"Rightsize compute instances based on CPU/memory headroom.",
 			"Schedule dev/test environments to stop outside business hours.",
 			"Enable lifecycle policies to transition cold object storage.",
@@ -1198,8 +1192,8 @@ func handleSyncProvider(w http.ResponseWriter, r *http.Request) {
 	resources = filter(resources, func(cr CloudResource) bool { return cr.Provider != id })
 	switch id {
 	case "aws":
-		awsCreds := AWSCredentials{AccessKeyID: p.AWSAccessKeyID, SecretAccessKey: p.AWSSecretAccessKey, Region: p.AWSRegion}
-		fetched, err := awsListResources(r.Context(), awsCreds)
+		awsCreds := providerspkg.AWSCredentials{AccessKeyID: p.AWSAccessKeyID, SecretAccessKey: p.AWSSecretAccessKey, Region: p.AWSRegion}
+		fetched, err := providerspkg.AWSListResources(r.Context(), awsCreds)
 		if err != nil {
 			log.Printf("aws sync error: %v", err)
 			writeJSON(w, http.StatusBadGateway, map[string]string{"message": "aws sync failed"})
@@ -1207,8 +1201,8 @@ func handleSyncProvider(w http.ResponseWriter, r *http.Request) {
 		}
 		resources = append(resources, fetched...)
 	case "gcp":
-		gcpCreds := GCPCredentials{ProjectID: p.GCPProjectID, ServiceAccountJSON: p.GCPServiceAccountJSON, Region: p.GCPRegion}
-		fetched, err := gcpListResources(r.Context(), gcpCreds)
+		gcpCreds := providerspkg.GCPCredentials{ProjectID: p.GCPProjectID, ServiceAccountJSON: p.GCPServiceAccountJSON, Region: p.GCPRegion}
+		fetched, err := providerspkg.GCPListResources(r.Context(), gcpCreds)
 		if err != nil {
 			log.Printf("gcp sync error: %v", err)
 			writeJSON(w, http.StatusBadGateway, map[string]string{"message": "gcp sync failed"})
@@ -1216,8 +1210,8 @@ func handleSyncProvider(w http.ResponseWriter, r *http.Request) {
 		}
 		resources = append(resources, fetched...)
 	case "azure":
-		azCreds := AzureCredentials{TenantID: p.AzureTenantID, ClientID: p.AzureClientID, ClientSecret: p.AzureClientSecret, SubscriptionID: p.AzureSubscriptionID, Location: p.AzureLocation}
-		fetched, err := azureListResources(r.Context(), azCreds)
+		azCreds := providerspkg.AzureCredentials{TenantID: p.AzureTenantID, ClientID: p.AzureClientID, ClientSecret: p.AzureClientSecret, SubscriptionID: p.AzureSubscriptionID, Location: p.AzureLocation}
+		fetched, err := providerspkg.AzureListResources(r.Context(), azCreds)
 		if err != nil {
 			log.Printf("azure sync error: %v", err)
 			writeJSON(w, http.StatusBadGateway, map[string]string{"message": "azure sync failed"})
@@ -1706,22 +1700,22 @@ func handleRunScan(w http.ResponseWriter, r *http.Request) {
 
 			switch id {
 			case "aws":
-				awsCreds := AWSCredentials{AccessKeyID: p.AWSAccessKeyID, SecretAccessKey: p.AWSSecretAccessKey, Region: p.AWSRegion}
-				if items, err := awsListResources(ctx, awsCreds); err == nil {
+				awsCreds := providerspkg.AWSCredentials{AccessKeyID: p.AWSAccessKeyID, SecretAccessKey: p.AWSSecretAccessKey, Region: p.AWSRegion}
+				if items, err := providerspkg.AWSListResources(ctx, awsCreds); err == nil {
 					aggregated = append(aggregated, items...)
 				} else {
 					log.Printf("scan aws error: %v", err)
 				}
 			case "gcp":
-				gcpCreds := GCPCredentials{ProjectID: p.GCPProjectID, ServiceAccountJSON: p.GCPServiceAccountJSON, Region: p.GCPRegion}
-				if items, err := gcpListResources(ctx, gcpCreds); err == nil {
+				gcpCreds := providerspkg.GCPCredentials{ProjectID: p.GCPProjectID, ServiceAccountJSON: p.GCPServiceAccountJSON, Region: p.GCPRegion}
+				if items, err := providerspkg.GCPListResources(ctx, gcpCreds); err == nil {
 					aggregated = append(aggregated, items...)
 				} else {
 					log.Printf("scan gcp error: %v", err)
 				}
 			case "azure":
-				azCreds := AzureCredentials{TenantID: p.AzureTenantID, ClientID: p.AzureClientID, ClientSecret: p.AzureClientSecret, SubscriptionID: p.AzureSubscriptionID, Location: p.AzureLocation}
-				if items, err := azureListResources(ctx, azCreds); err == nil {
+				azCreds := providerspkg.AzureCredentials{TenantID: p.AzureTenantID, ClientID: p.AzureClientID, ClientSecret: p.AzureClientSecret, SubscriptionID: p.AzureSubscriptionID, Location: p.AzureLocation}
+				if items, err := providerspkg.AzureListResources(ctx, azCreds); err == nil {
 					aggregated = append(aggregated, items...)
 				} else {
 					log.Printf("scan azure error: %v", err)
@@ -2290,7 +2284,7 @@ func filter[T any](in []T, keep func(T) bool) []T {
 func handleAICostAnalysis(w http.ResponseWriter, r *http.Request) {
 	rid := chi.URLParam(r, "resourceId")
 	prompt := "You are a FinOps assistant. Given a cloud resource, provide 3 actionable, provider-agnostic cost optimization steps. Resource ID: " + rid
-	suggestions := askOpenAI(r.Context(), prompt, []string{
+	suggestions := providerspkg.AskOpenAI(r.Context(), prompt, []string{
 		"Right-size compute instances based on recent CPU/Memory usage.",
 		"Schedule non-production resources to stop outside business hours.",
 		"Move infrequently accessed data to cheaper storage tiers.",
@@ -2301,7 +2295,7 @@ func handleAICostAnalysis(w http.ResponseWriter, r *http.Request) {
 func handleAISecurityAnalysis(w http.ResponseWriter, r *http.Request) {
 	rid := chi.URLParam(r, "resourceId")
 	prompt := "You are a cloud security assistant. Provide 3 hardening steps for this resource focusing on least privilege, network access, and encryption. Resource ID: " + rid
-	suggestions := askOpenAI(r.Context(), prompt, []string{
+	suggestions := providerspkg.AskOpenAI(r.Context(), prompt, []string{
 		"Audit IAM permissions and restrict to least privilege for this resource.",
 		"Ensure network access is restricted to required CIDR ranges and ports.",
 		"Enforce encryption at rest and in transit; rotate keys regularly.",
@@ -2312,7 +2306,7 @@ func handleAISecurityAnalysis(w http.ResponseWriter, r *http.Request) {
 func handleAIRecommendations(w http.ResponseWriter, r *http.Request) {
 	rid := chi.URLParam(r, "resourceId")
 	prompt := "Summarize the top 5 prioritized actions to reduce cost and improve security posture for the given resource. Resource ID: " + rid
-	suggestions := askOpenAI(r.Context(), prompt, []string{
+	suggestions := providerspkg.AskOpenAI(r.Context(), prompt, []string{
 		"Consolidate underutilized instances and adopt autoscaling.",
 		"Enable lifecycle policies to transition cold data to archival tiers.",
 		"Tighten security groups; remove 0.0.0.0/0 where unnecessary.",

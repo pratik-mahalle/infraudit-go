@@ -1,4 +1,4 @@
-package main
+package providers
 
 import (
 	"context"
@@ -7,7 +7,8 @@ import (
 	openai "github.com/sashabaranov/go-openai"
 )
 
-func askOpenAI(ctx context.Context, prompt string, fallback []string) []string {
+// AskOpenAI sends a prompt and returns the first message content, or fallback on error.
+func AskOpenAI(ctx context.Context, prompt string, fallback []string) []string {
 	apiKey := os.Getenv("OPENAI_API_KEY")
 	if apiKey == "" {
 		return fallback

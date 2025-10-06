@@ -1,4 +1,4 @@
-package main
+package providers
 
 import (
 	"context"
@@ -8,6 +8,8 @@ import (
 	armcompute "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v5"
 	armresources "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources"
 	armstorage "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/storage/armstorage"
+
+	"infraaudit/backend/internal/services"
 )
 
 type AzureCredentials struct {
@@ -18,15 +20,14 @@ type AzureCredentials struct {
 	Location       string
 }
 
-func azureListResources(ctx context.Context, creds AzureCredentials) ([]CloudResource, error) {
+func AzureListResources(ctx context.Context, creds AzureCredentials) ([]services.CloudResource, error) {
 	cred, err := azidentity.NewClientSecretCredential(creds.TenantID, creds.ClientID, creds.ClientSecret, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	var out []CloudResource
+	var out []services.CloudResource
 
-	// Enumerate resource groups and list resources within
 	rgClient, err := armresources.NewResourceGroupsClient(creds.SubscriptionID, cred, nil)
 	if err != nil {
 		return nil, err
@@ -41,7 +42,6 @@ func azureListResources(ctx context.Context, creds AzureCredentials) ([]CloudRes
 		for _, rg := range page.Value {
 			group := *rg.Name
 
-			// Virtual Machines
 			vmClient, err := armcompute.NewVirtualMachinesClient(creds.SubscriptionID, cred, nil)
 			if err == nil {
 				vmPager := vmClient.NewListPager(group, nil)
@@ -64,14 +64,13 @@ func azureListResources(ctx context.Context, creds AzureCredentials) ([]CloudRes
 						if vm.Location != nil && *vm.Location != "" {
 							region = *vm.Location
 						}
-						out = append(out, CloudResource{ID: id, Name: name, Type: "VM", Provider: "azure", Region: region, Status: "unknown"})
+						out = append(out, services.CloudResource{ID: id, Name: name, Type: "VM", Provider: "azure", Region: region, Status: "unknown"})
 					}
 				}
 			} else {
 				log.Printf("azure vm client error: %v", err)
 			}
 
-			// Virtual Machine Scale Sets
 			vmssClient, err := armcompute.NewVirtualMachineScaleSetsClient(creds.SubscriptionID, cred, nil)
 			if err == nil {
 				vmssPager := vmssClient.NewListPager(group, nil)
@@ -94,14 +93,13 @@ func azureListResources(ctx context.Context, creds AzureCredentials) ([]CloudRes
 						if ss.Location != nil && *ss.Location != "" {
 							region = *ss.Location
 						}
-						out = append(out, CloudResource{ID: id, Name: name, Type: "VMSS", Provider: "azure", Region: region, Status: "unknown"})
+						out = append(out, services.CloudResource{ID: id, Name: name, Type: "VMSS", Provider: "azure", Region: region, Status: "unknown"})
 					}
 				}
 			} else {
 				log.Printf("azure vmss client error: %v", err)
 			}
 
-			// Storage accounts
 			stClient, err := armstorage.NewAccountsClient(creds.SubscriptionID, cred, nil)
 			if err == nil {
 				stPager := stClient.NewListByResourceGroupPager(group, nil)
@@ -124,7 +122,7 @@ func azureListResources(ctx context.Context, creds AzureCredentials) ([]CloudRes
 						if acc.Location != nil && *acc.Location != "" {
 							region = *acc.Location
 						}
-						out = append(out, CloudResource{ID: id, Name: name, Type: "Storage", Provider: "azure", Region: region, Status: "available"})
+						out = append(out, services.CloudResource{ID: id, Name: name, Type: "Storage", Provider: "azure", Region: region, Status: "available"})
 					}
 				}
 			} else {
