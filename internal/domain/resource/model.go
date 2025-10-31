@@ -4,16 +4,18 @@ import "time"
 
 // Resource represents a cloud resource
 type Resource struct {
-	ID         string    `json:"id"`
-	UserID     int64     `json:"user_id"`
-	Provider   string    `json:"provider"`
-	ResourceID string    `json:"resource_id"`
-	Name       string    `json:"name"`
-	Type       string    `json:"type"`
-	Region     string    `json:"region"`
-	Status     string    `json:"status"`
-	CreatedAt  time.Time `json:"created_at,omitempty"`
-	UpdatedAt  time.Time `json:"updated_at,omitempty"`
+	ID            string    `json:"id"`
+	UserID        int64     `json:"user_id"`
+	Provider      string    `json:"provider"`
+	ResourceID    string    `json:"resource_id"`
+	Name          string    `json:"name"`
+	Type          string    `json:"type"`
+	Region        string    `json:"region"`
+	Status        string    `json:"status"`
+	Configuration string    `json:"configuration,omitempty"` // JSON string of full resource config
+	LastScanned   time.Time `json:"last_scanned,omitempty"`
+	CreatedAt     time.Time `json:"created_at,omitempty"`
+	UpdatedAt     time.Time `json:"updated_at,omitempty"`
 }
 
 // Resource types

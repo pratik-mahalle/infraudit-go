@@ -58,6 +58,7 @@ func main() {
 	recommendationRepo := postgres.NewRecommendationRepository(db)
 	driftRepo := postgres.NewDriftRepository(db)
 	anomalyRepo := postgres.NewAnomalyRepository(db)
+	baselineRepo := postgres.NewBaselineRepository(db)
 
 	// Initialize services
 	userService := services.NewUserService(userRepo, log)
@@ -65,7 +66,8 @@ func main() {
 	providerService := services.NewProviderService(providerRepo, resourceRepo, log)
 	alertService := services.NewAlertService(alertRepo, log)
 	recommendationService := services.NewRecommendationService(recommendationRepo, log)
-	driftService := services.NewDriftService(driftRepo, log)
+	baselineService := services.NewBaselineService(baselineRepo, log)
+	driftService := services.NewDriftService(driftRepo, baselineRepo, resourceRepo, log)
 	anomalyService := services.NewAnomalyService(anomalyRepo, log)
 
 	// Initialize handlers
@@ -78,6 +80,7 @@ func main() {
 		Recommendation: handlers.NewRecommendationHandler(recommendationService, log, val),
 		Drift:          handlers.NewDriftHandler(driftService, log, val),
 		Anomaly:        handlers.NewAnomalyHandler(anomalyService, log, val),
+		Baseline:       handlers.NewBaselineHandler(baselineService, log),
 	}
 
 	// Setup router

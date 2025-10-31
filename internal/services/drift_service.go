@@ -3,21 +3,35 @@ package services
 import (
 	"context"
 
+	"infraaudit/backend/internal/detector"
+	"infraaudit/backend/internal/domain/baseline"
 	"infraaudit/backend/internal/domain/drift"
+	"infraaudit/backend/internal/domain/resource"
 	"infraaudit/backend/internal/pkg/logger"
 )
 
 // DriftService implements drift.Service
 type DriftService struct {
-	repo   drift.Repository
-	logger *logger.Logger
+	repo         drift.Repository
+	baselineRepo baseline.Repository
+	resourceRepo resource.Repository
+	detector     *detector.DriftDetector
+	logger       *logger.Logger
 }
 
 // NewDriftService creates a new drift service
-func NewDriftService(repo drift.Repository, log *logger.Logger) drift.Service {
+func NewDriftService(
+	repo drift.Repository,
+	baselineRepo baseline.Repository,
+	resourceRepo resource.Repository,
+	log *logger.Logger,
+) drift.Service {
 	return &DriftService{
-		repo:   repo,
-		logger: log,
+		repo:         repo,
+		baselineRepo: baselineRepo,
+		resourceRepo: resourceRepo,
+		detector:     detector.NewDriftDetector(),
+		logger:       log,
 	}
 }
 
@@ -133,11 +147,101 @@ func (s *DriftService) UpdateStatus(ctx context.Context, userID int64, id int64,
 
 // DetectDrifts detects configuration drifts for a user
 func (s *DriftService) DetectDrifts(ctx context.Context, userID int64) error {
-	// This would analyze resources and detect drifts
-	// For now, it's a placeholder
 	s.logger.WithFields(map[string]interface{}{
 		"user_id": userID,
-	}).Info("Detecting drifts")
+	}).Info("Starting drift detection")
+
+	// Get all resources for the user
+	resources, _, err := s.resourceRepo.List(ctx, userID, resource.Filter{}, 1000, 0)
+	if err != nil {
+		s.logger.ErrorWithErr(err, "Failed to fetch resources for drift detection")
+		return err
+	}
+
+	driftsDetected := 0
+	driftsCreated := 0
+
+	// Check each resource against its baseline
+	for _, res := range resources {
+		// Skip resources without configuration data
+		if res.Configuration == "" {
+			s.logger.WithFields(map[string]interface{}{
+				"resource_id": res.ResourceID,
+			}).Debug("Skipping resource without configuration")
+			continue
+		}
+
+		// Get baseline for this resource
+		resBaseline, err := s.baselineRepo.GetByResourceID(ctx, userID, res.ResourceID, baseline.TypeApproved)
+		if err != nil {
+			// If no baseline exists, create an automatic one
+			if err.Error() == "Baseline not found" {
+				s.logger.WithFields(map[string]interface{}{
+					"resource_id": res.ResourceID,
+				}).Info("Creating automatic baseline for resource")
+
+				newBaseline := &baseline.Baseline{
+					UserID:        userID,
+					ResourceID:    res.ResourceID,
+					Provider:      res.Provider,
+					ResourceType:  res.Type,
+					Configuration: res.Configuration,
+					BaselineType:  baseline.TypeAutomatic,
+					Description:   "Auto-created baseline on first scan",
+				}
+				_, err := s.baselineRepo.Create(ctx, newBaseline)
+				if err != nil {
+					s.logger.ErrorWithErr(err, "Failed to create automatic baseline")
+				}
+				continue
+			}
+
+			s.logger.ErrorWithErr(err, "Failed to get baseline")
+			continue
+		}
+
+		// Detect drift by comparing configurations
+		result, err := s.detector.DetectDrift(res.Type, resBaseline.Configuration, res.Configuration)
+		if err != nil {
+			s.logger.ErrorWithErr(err, "Failed to detect drift")
+			continue
+		}
+
+		if result.HasDrift {
+			driftsDetected++
+
+			// Create drift record
+			d := &drift.Drift{
+				UserID:     userID,
+				ResourceID: res.ResourceID,
+				DriftType:  result.DriftType,
+				Severity:   result.Severity,
+				Details:    result.Details,
+				Status:     drift.StatusDetected,
+			}
+
+			_, err := s.repo.Create(ctx, d)
+			if err != nil {
+				s.logger.ErrorWithErr(err, "Failed to create drift record")
+				continue
+			}
+
+			driftsCreated++
+
+			s.logger.WithFields(map[string]interface{}{
+				"resource_id": res.ResourceID,
+				"drift_type":  result.DriftType,
+				"severity":    result.Severity,
+			}).Info("Drift detected and recorded")
+		}
+	}
+
+	s.logger.WithFields(map[string]interface{}{
+		"user_id":         userID,
+		"resources":       len(resources),
+		"drifts_detected": driftsDetected,
+		"drifts_created":  driftsCreated,
+	}).Info("Drift detection completed")
 
 	return nil
 }

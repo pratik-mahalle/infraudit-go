@@ -20,7 +20,7 @@ type Client struct {
 
 // Config holds the client configuration
 type Config struct {
-	BaseURL    string        // API base URL (e.g., "https://api.infraaudit.com")
+	BaseURL    string        // API base URL (e.g., "https://api.infraudit.dev")
 	APIKey     string        // Optional API key for authentication
 	Timeout    time.Duration // HTTP client timeout (default: 30s)
 	HTTPClient *http.Client  // Optional custom HTTP client
