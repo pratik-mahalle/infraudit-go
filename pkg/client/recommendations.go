@@ -15,9 +15,9 @@ type RecommendationService struct {
 // RecommendationListOptions contains options for listing recommendations
 type RecommendationListOptions struct {
 	ListOptions
-	Type       *string `json:"type,omitempty"`       // cost, performance, security
-	Impact     *string `json:"impact,omitempty"`     // high, medium, low
-	Status     *string `json:"status,omitempty"`     // pending, applied, dismissed
+	Type       *string `json:"type,omitempty"`   // cost, performance, security
+	Impact     *string `json:"impact,omitempty"` // high, medium, low
+	Status     *string `json:"status,omitempty"` // pending, applied, dismissed
 	ResourceID *int64  `json:"resource_id,omitempty"`
 }
 
@@ -42,6 +42,9 @@ func (s *RecommendationService) List(ctx context.Context, opts *RecommendationLi
 		}
 		if opts.Order != "" {
 			query.Set("order", opts.Order)
+		}
+		if opts.Search != "" {
+			query.Set("search", opts.Search)
 		}
 		if opts.Type != nil {
 			query.Set("type", *opts.Type)
