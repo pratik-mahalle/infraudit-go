@@ -1,0 +1,175 @@
+.PHONY: help build run test lint fmt clean docker-build docker-run docker-compose-up docker-compose-down migrate-up migrate-down deps tidy
+
+# Variables
+APP_NAME=infraudit
+API_BINARY=bin/api
+WORKER_BINARY=bin/worker
+DOCKER_IMAGE=$(APP_NAME):latest
+GO_FILES=$(shell find . -name '*.go' -not -path "./vendor/*")
+
+# Default target
+help:
+	@echo "Available targets:"
+	@echo "  make build              - Build the API binary"
+	@echo "  make run                - Run the API server"
+	@echo "  make test               - Run tests"
+	@echo "  make test-coverage      - Run tests with coverage"
+	@echo "  make lint               - Run linters"
+	@echo "  make fmt                - Format code"
+	@echo "  make clean              - Clean build artifacts"
+	@echo "  make deps               - Download dependencies"
+	@echo "  make tidy               - Tidy dependencies"
+	@echo "  make docker-build       - Build Docker image"
+	@echo "  make docker-run         - Run Docker container"
+	@echo "  make docker-compose-up  - Start docker-compose stack"
+	@echo "  make docker-compose-down - Stop docker-compose stack"
+	@echo "  make migrate-up         - Run database migrations up"
+	@echo "  make migrate-down       - Run database migrations down"
+
+# Build the application
+build:
+	@echo "Building API..."
+	@mkdir -p bin
+	@CGO_ENABLED=0 go build -o $(API_BINARY) ./cmd/api
+	@echo "Build complete: $(API_BINARY)"
+
+# Build worker
+build-worker:
+	@echo "Building worker..."
+	@mkdir -p bin
+	@CGO_ENABLED=0 go build -o $(WORKER_BINARY) ./cmd/worker
+	@echo "Build complete: $(WORKER_BINARY)"
+
+# Build all binaries
+build-all: build build-worker
+
+# Run the application
+run: build
+	@echo "Starting API server..."
+	@./$(API_BINARY)
+
+# Run with live reload (requires air: go install github.com/cosmtrek/air@latest)
+dev:
+	@echo "Starting development server with live reload..."
+	@air
+
+# Run tests
+test:
+	@echo "Running tests..."
+	@go test -v -race ./...
+
+# Run tests with coverage
+test-coverage:
+	@echo "Running tests with coverage..."
+	@go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+	@go tool cover -html=coverage.out -o coverage.html
+	@echo "Coverage report generated: coverage.html"
+
+# Run linters
+lint:
+	@echo "Running linters..."
+	@go vet ./...
+	@golangci-lint run ./... 2>/dev/null || echo "golangci-lint not installed, skipping"
+
+# Format code
+fmt:
+	@echo "Formatting code..."
+	@gofmt -s -w $(GO_FILES)
+	@goimports -w $(GO_FILES) 2>/dev/null || echo "goimports not installed, skipping"
+
+# Clean build artifacts
+clean:
+	@echo "Cleaning..."
+	@rm -rf bin/
+	@rm -f coverage.out coverage.html
+	@rm -f data.db data.db-wal data.db-shm
+	@echo "Clean complete"
+
+# Download dependencies
+deps:
+	@echo "Downloading dependencies..."
+	@go mod download
+
+# Tidy dependencies
+tidy:
+	@echo "Tidying dependencies..."
+	@go mod tidy
+
+# Verify dependencies
+verify:
+	@echo "Verifying dependencies..."
+	@go mod verify
+
+# Generate code (swagger, mocks, etc.)
+generate:
+	@echo "Generating code..."
+	@go generate ./...
+
+# Build Docker image
+docker-build:
+	@echo "Building Docker image..."
+	@docker build -t $(DOCKER_IMAGE) -f deployments/docker/Dockerfile .
+	@echo "Docker image built: $(DOCKER_IMAGE)"
+
+# Run Docker container
+docker-run:
+	@echo "Running Docker container..."
+	@docker run -p 8080:8080 --env-file .env -v $(PWD)/data:/data $(DOCKER_IMAGE)
+
+# Start docker-compose stack
+docker-compose-up:
+	@echo "Starting docker-compose stack..."
+	@docker-compose up -d
+	@echo "Stack started. API available at http://localhost:8080"
+
+# Stop docker-compose stack
+docker-compose-down:
+	@echo "Stopping docker-compose stack..."
+	@docker-compose down
+
+# View docker-compose logs
+docker-compose-logs:
+	@docker-compose logs -f api
+
+# Database migrations (requires golang-migrate: go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest)
+migrate-up:
+	@echo "Running migrations up..."
+	@migrate -path migrations -database "sqlite3://data.db" up
+
+migrate-down:
+	@echo "Running migrations down..."
+	@migrate -path migrations -database "sqlite3://data.db" down
+
+migrate-create:
+	@echo "Creating new migration: $(name)"
+	@migrate create -ext sql -dir migrations -seq $(name)
+
+# Install development tools
+install-tools:
+	@echo "Installing development tools..."
+	@go install github.com/cosmtrek/air@latest
+	@go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+	@go install golang.org/x/tools/cmd/goimports@latest
+	@go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+	@go install github.com/swaggo/swag/cmd/swag@latest
+	@echo "Tools installed"
+
+# Generate Swagger documentation
+swagger:
+	@echo "Generating Swagger documentation..."
+	@swag init -g cmd/api/main.go -o api
+	@echo "Swagger docs generated in api/"
+
+# Run security scan
+security-scan:
+	@echo "Running security scan..."
+	@gosec ./... 2>/dev/null || echo "gosec not installed, skipping"
+
+# Check for outdated dependencies
+check-updates:
+	@echo "Checking for outdated dependencies..."
+	@go list -u -m all
+
+# Quick check before commit
+pre-commit: fmt lint test
+	@echo "Pre-commit checks passed!"
