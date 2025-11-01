@@ -3,8 +3,8 @@ package detector
 import (
 	"strings"
 
-	"infraaudit/backend/internal/domain/drift"
-	"infraaudit/backend/internal/domain/resource"
+	"github.com/pratik-mahalle/infraudit/internal/domain/drift"
+	"github.com/pratik-mahalle/infraudit/internal/domain/resource"
 )
 
 // SecurityRule defines criteria for security-relevant configuration changes

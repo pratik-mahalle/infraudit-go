@@ -18,6 +18,7 @@ type Config struct {
 	Redis    RedisConfig
 	Logging  LoggingConfig
 	Provider ProviderConfig
+	Scanner  ScannerConfig
 }
 
 // ServerConfig contains HTTP server configuration
@@ -100,6 +101,13 @@ type ProviderConfig struct {
 	StripeAPIKey    string
 }
 
+// ScannerConfig contains vulnerability scanner configuration
+type ScannerConfig struct {
+	TrivyPath      string
+	TrivyCacheDir  string
+	NVDAPIKey      string
+}
+
 // Load loads configuration from environment variables
 func Load() (*Config, error) {
 	// Load .env file if it exists (ignore errors as it's optional)
@@ -164,6 +172,11 @@ func Load() (*Config, error) {
 			SlackWebhookURL: getEnv("SLACK_WEBHOOK_URL", ""),
 			SlackChannel:    getEnv("SLACK_CHANNEL", "#alerts"),
 			StripeAPIKey:    getEnv("STRIPE_API_KEY", ""),
+		},
+		Scanner: ScannerConfig{
+			TrivyPath:     getEnv("TRIVY_PATH", "trivy"),
+			TrivyCacheDir: getEnv("TRIVY_CACHE_DIR", "/tmp/trivy-cache"),
+			NVDAPIKey:     getEnv("NVD_API_KEY", ""),
 		},
 	}
 

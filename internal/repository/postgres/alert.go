@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"infraaudit/backend/internal/domain/alert"
-	"infraaudit/backend/internal/pkg/errors"
+	"github.com/pratik-mahalle/infraudit/internal/domain/alert"
+	"github.com/pratik-mahalle/infraudit/internal/pkg/errors"
 )
 
 type AlertRepository struct {

@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"infraaudit/backend/internal/domain/provider"
-	"infraaudit/backend/internal/domain/resource"
-	"infraaudit/backend/internal/pkg/errors"
-	"infraaudit/backend/internal/pkg/logger"
+	"github.com/pratik-mahalle/infraudit/internal/domain/provider"
+	"github.com/pratik-mahalle/infraudit/internal/domain/resource"
+	"github.com/pratik-mahalle/infraudit/internal/pkg/errors"
+	"github.com/pratik-mahalle/infraudit/internal/pkg/logger"
 )
 
 // ProviderService implements provider.Service

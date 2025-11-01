@@ -5,8 +5,8 @@ import (
 	"database/sql"
 	"time"
 
-	"infraaudit/backend/internal/domain/baseline"
-	"infraaudit/backend/internal/pkg/errors"
+	"github.com/pratik-mahalle/infraudit/internal/domain/baseline"
+	"github.com/pratik-mahalle/infraudit/internal/pkg/errors"
 )
 
 type BaselineRepository struct {

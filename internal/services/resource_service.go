@@ -3,9 +3,9 @@ package services
 import (
 	"context"
 
-	"infraaudit/backend/internal/domain/resource"
-	"infraaudit/backend/internal/pkg/errors"
-	"infraaudit/backend/internal/pkg/logger"
+	"github.com/pratik-mahalle/infraudit/internal/domain/resource"
+	"github.com/pratik-mahalle/infraudit/internal/pkg/errors"
+	"github.com/pratik-mahalle/infraudit/internal/pkg/logger"
 )
 
 // ResourceService implements resource.Service

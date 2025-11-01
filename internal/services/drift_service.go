@@ -3,11 +3,11 @@ package services
 import (
 	"context"
 
-	"infraaudit/backend/internal/detector"
-	"infraaudit/backend/internal/domain/baseline"
-	"infraaudit/backend/internal/domain/drift"
-	"infraaudit/backend/internal/domain/resource"
-	"infraaudit/backend/internal/pkg/logger"
+	"github.com/pratik-mahalle/infraudit/internal/detector"
+	"github.com/pratik-mahalle/infraudit/internal/domain/baseline"
+	"github.com/pratik-mahalle/infraudit/internal/domain/drift"
+	"github.com/pratik-mahalle/infraudit/internal/domain/resource"
+	"github.com/pratik-mahalle/infraudit/internal/pkg/logger"
 )
 
 // DriftService implements drift.Service

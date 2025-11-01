@@ -3,8 +3,8 @@ package services
 import (
 	"context"
 
-	"infraaudit/backend/internal/domain/alert"
-	"infraaudit/backend/internal/pkg/logger"
+	"github.com/pratik-mahalle/infraudit/internal/domain/alert"
+	"github.com/pratik-mahalle/infraudit/internal/pkg/logger"
 )
 
 // AlertService implements alert.Service

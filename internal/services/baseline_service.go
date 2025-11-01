@@ -3,8 +3,8 @@ package services
 import (
 	"context"
 
-	"infraaudit/backend/internal/domain/baseline"
-	"infraaudit/backend/internal/pkg/logger"
+	"github.com/pratik-mahalle/infraudit/internal/domain/baseline"
+	"github.com/pratik-mahalle/infraudit/internal/pkg/logger"
 )
 
 // BaselineService implements baseline.Service
