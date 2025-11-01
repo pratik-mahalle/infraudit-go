@@ -2,6 +2,7 @@ package providers
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
@@ -64,7 +65,20 @@ func AzureListResources(ctx context.Context, creds AzureCredentials) ([]services
 						if vm.Location != nil && *vm.Location != "" {
 							region = *vm.Location
 						}
-						out = append(out, services.CloudResource{ID: id, Name: name, Type: "VM", Provider: "azure", Region: region, Status: "unknown"})
+
+						// Build full configuration
+						config := buildAzureVMConfiguration(vm)
+						configJSON, _ := json.Marshal(config)
+
+						out = append(out, services.CloudResource{
+							ID:            id,
+							Name:          name,
+							Type:          "VM",
+							Provider:      "azure",
+							Region:        region,
+							Status:        "unknown",
+							Configuration: string(configJSON),
+						})
 					}
 				}
 			} else {
@@ -93,7 +107,20 @@ func AzureListResources(ctx context.Context, creds AzureCredentials) ([]services
 						if ss.Location != nil && *ss.Location != "" {
 							region = *ss.Location
 						}
-						out = append(out, services.CloudResource{ID: id, Name: name, Type: "VMSS", Provider: "azure", Region: region, Status: "unknown"})
+
+						// Build full configuration
+						config := buildAzureVMSSConfiguration(ss)
+						configJSON, _ := json.Marshal(config)
+
+						out = append(out, services.CloudResource{
+							ID:            id,
+							Name:          name,
+							Type:          "VMSS",
+							Provider:      "azure",
+							Region:        region,
+							Status:        "unknown",
+							Configuration: string(configJSON),
+						})
 					}
 				}
 			} else {
@@ -122,7 +149,20 @@ func AzureListResources(ctx context.Context, creds AzureCredentials) ([]services
 						if acc.Location != nil && *acc.Location != "" {
 							region = *acc.Location
 						}
-						out = append(out, services.CloudResource{ID: id, Name: name, Type: "Storage", Provider: "azure", Region: region, Status: "available"})
+
+						// Build full configuration
+						config := buildAzureStorageConfiguration(acc)
+						configJSON, _ := json.Marshal(config)
+
+						out = append(out, services.CloudResource{
+							ID:            id,
+							Name:          name,
+							Type:          "Storage",
+							Provider:      "azure",
+							Region:        region,
+							Status:        "available",
+							Configuration: string(configJSON),
+						})
 					}
 				}
 			} else {
@@ -132,4 +172,221 @@ func AzureListResources(ctx context.Context, creds AzureCredentials) ([]services
 	}
 
 	return out, nil
+}
+
+// buildAzureVMConfiguration creates a comprehensive configuration object for Azure VMs
+func buildAzureVMConfiguration(vm *armcompute.VirtualMachine) map[string]interface{} {
+	config := map[string]interface{}{
+		"vm_id":    ptrStr(vm.ID),
+		"name":     ptrStr(vm.Name),
+		"location": ptrStr(vm.Location),
+	}
+
+	// VM size
+	if vm.Properties != nil && vm.Properties.HardwareProfile != nil {
+		config["vm_size"] = string(*vm.Properties.HardwareProfile.VMSize)
+	}
+
+	// Tags
+	if vm.Tags != nil {
+		tags := make(map[string]string)
+		for k, v := range vm.Tags {
+			if v != nil {
+				tags[k] = *v
+			}
+		}
+		config["tags"] = tags
+	}
+
+	// Network interfaces
+	if vm.Properties != nil && vm.Properties.NetworkProfile != nil && vm.Properties.NetworkProfile.NetworkInterfaces != nil {
+		nics := make([]map[string]string, 0)
+		for _, nic := range vm.Properties.NetworkProfile.NetworkInterfaces {
+			nics = append(nics, map[string]string{
+				"id": ptrStr(nic.ID),
+			})
+		}
+		config["network_interfaces"] = nics
+	}
+
+	// OS disk encryption
+	if vm.Properties != nil && vm.Properties.StorageProfile != nil && vm.Properties.StorageProfile.OSDisk != nil {
+		osDisk := vm.Properties.StorageProfile.OSDisk
+		config["os_disk"] = map[string]interface{}{
+			"name":         ptrStr(osDisk.Name),
+			"create_option": string(*osDisk.CreateOption),
+		}
+		if osDisk.ManagedDisk != nil && osDisk.ManagedDisk.DiskEncryptionSet != nil {
+			config["encryption"] = map[string]interface{}{
+				"enabled": true,
+				"disk_encryption_set": ptrStr(osDisk.ManagedDisk.DiskEncryptionSet.ID),
+			}
+		} else {
+			config["encryption"] = map[string]interface{}{
+				"enabled": false,
+			}
+		}
+	}
+
+	// Identity (managed identity)
+	if vm.Identity != nil {
+		config["identity"] = map[string]interface{}{
+			"type": string(*vm.Identity.Type),
+		}
+	}
+
+	// Security profile
+	if vm.Properties != nil && vm.Properties.SecurityProfile != nil {
+		security := make(map[string]interface{})
+		if vm.Properties.SecurityProfile.EncryptionAtHost != nil {
+			security["encryption_at_host"] = *vm.Properties.SecurityProfile.EncryptionAtHost
+		}
+		if vm.Properties.SecurityProfile.SecurityType != nil {
+			security["security_type"] = string(*vm.Properties.SecurityProfile.SecurityType)
+		}
+		config["security_profile"] = security
+	}
+
+	return config
+}
+
+// buildAzureVMSSConfiguration creates a comprehensive configuration object for Azure VMSS
+func buildAzureVMSSConfiguration(vmss *armcompute.VirtualMachineScaleSet) map[string]interface{} {
+	config := map[string]interface{}{
+		"vmss_id":  ptrStr(vmss.ID),
+		"name":     ptrStr(vmss.Name),
+		"location": ptrStr(vmss.Location),
+	}
+
+	// SKU
+	if vmss.SKU != nil {
+		config["sku"] = map[string]interface{}{
+			"name":     ptrStr(vmss.SKU.Name),
+			"tier":     ptrStr(vmss.SKU.Tier),
+			"capacity": ptrInt64(vmss.SKU.Capacity),
+		}
+	}
+
+	// Tags
+	if vmss.Tags != nil {
+		tags := make(map[string]string)
+		for k, v := range vmss.Tags {
+			if v != nil {
+				tags[k] = *v
+			}
+		}
+		config["tags"] = tags
+	}
+
+	// Upgrade policy
+	if vmss.Properties != nil && vmss.Properties.UpgradePolicy != nil {
+		config["upgrade_policy"] = map[string]interface{}{
+			"mode": string(*vmss.Properties.UpgradePolicy.Mode),
+		}
+	}
+
+	// Identity
+	if vmss.Identity != nil {
+		config["identity"] = map[string]interface{}{
+			"type": string(*vmss.Identity.Type),
+		}
+	}
+
+	return config
+}
+
+// buildAzureStorageConfiguration creates a comprehensive configuration object for Azure Storage accounts
+func buildAzureStorageConfiguration(acc *armstorage.Account) map[string]interface{} {
+	config := map[string]interface{}{
+		"account_id": ptrStr(acc.ID),
+		"name":       ptrStr(acc.Name),
+		"location":   ptrStr(acc.Location),
+	}
+
+	// SKU
+	if acc.SKU != nil {
+		config["sku"] = map[string]interface{}{
+			"name": string(*acc.SKU.Name),
+			"tier": string(*acc.SKU.Tier),
+		}
+	}
+
+	// Kind
+	if acc.Kind != nil {
+		config["kind"] = string(*acc.Kind)
+	}
+
+	// Tags
+	if acc.Tags != nil {
+		tags := make(map[string]string)
+		for k, v := range acc.Tags {
+			if v != nil {
+				tags[k] = *v
+			}
+		}
+		config["tags"] = tags
+	}
+
+	// Properties
+	if acc.Properties != nil {
+		props := make(map[string]interface{})
+
+		// Encryption
+		if acc.Properties.Encryption != nil && acc.Properties.Encryption.Services != nil {
+			encryption := make(map[string]interface{})
+			if acc.Properties.Encryption.Services.Blob != nil {
+				encryption["blob_enabled"] = ptrBool(acc.Properties.Encryption.Services.Blob.Enabled)
+			}
+			if acc.Properties.Encryption.Services.File != nil {
+				encryption["file_enabled"] = ptrBool(acc.Properties.Encryption.Services.File.Enabled)
+			}
+			props["encryption"] = encryption
+		}
+
+		// HTTPS only
+		if acc.Properties.EnableHTTPSTrafficOnly != nil {
+			props["https_only"] = *acc.Properties.EnableHTTPSTrafficOnly
+		}
+
+		// Public network access
+		if acc.Properties.PublicNetworkAccess != nil {
+			props["public_network_access"] = string(*acc.Properties.PublicNetworkAccess)
+		}
+
+		// Minimum TLS version
+		if acc.Properties.MinimumTLSVersion != nil {
+			props["minimum_tls_version"] = string(*acc.Properties.MinimumTLSVersion)
+		}
+
+		// Allow blob public access
+		if acc.Properties.AllowBlobPublicAccess != nil {
+			props["allow_blob_public_access"] = *acc.Properties.AllowBlobPublicAccess
+		}
+
+		config["properties"] = props
+	}
+
+	return config
+}
+
+// Helper functions for pointer dereferencing
+func ptrStr(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
+func ptrInt64(i *int64) int64 {
+	if i == nil {
+		return 0
+	}
+	return *i
+}
+
+func ptrBool(b *bool) bool {
+	if b == nil {
+		return false
+	}
+	return *b
 }
