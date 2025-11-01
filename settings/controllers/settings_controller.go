@@ -6,8 +6,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	m "infraudit/backend/settings/models"
-	u "infraudit/backend/settings/utils"
+	m "github.com/pratik-mahalle/infraudit/settings/models"
+	u "github.com/pratik-mahalle/infraudit/settings/utils"
 )
 
 // Profile

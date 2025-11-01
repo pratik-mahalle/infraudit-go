@@ -9,14 +9,14 @@ import (
 	"syscall"
 	"time"
 
-	"infraudit/backend/internal/api/handlers"
-	"infraudit/backend/internal/api/router"
-	"infraudit/backend/internal/config"
-	"infraudit/backend/internal/pkg/logger"
-	"infraudit/backend/internal/pkg/validator"
-	"infraudit/backend/internal/repository/postgres"
-	"infraudit/backend/internal/scanners"
-	"infraudit/backend/internal/services"
+	"github.com/pratik-mahalle/infraudit/internal/api/handlers"
+	"github.com/pratik-mahalle/infraudit/internal/api/router"
+	"github.com/pratik-mahalle/infraudit/internal/config"
+	"github.com/pratik-mahalle/infraudit/internal/pkg/logger"
+	"github.com/pratik-mahalle/infraudit/internal/pkg/validator"
+	"github.com/pratik-mahalle/infraudit/internal/repository/postgres"
+	"github.com/pratik-mahalle/infraudit/internal/scanners"
+	"github.com/pratik-mahalle/infraudit/internal/services"
 )
 
 func main() {

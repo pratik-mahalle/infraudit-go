@@ -5,8 +5,8 @@ import (
 	"database/sql"
 	"time"
 
-	"infraudit/backend/internal/domain/user"
-	"infraudit/backend/internal/pkg/errors"
+	"github.com/pratik-mahalle/infraudit/internal/domain/user"
+	"github.com/pratik-mahalle/infraudit/internal/pkg/errors"
 )
 
 // UserRepository implements user.Repository

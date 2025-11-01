@@ -13,7 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 
-	"infraudit/backend/internal/services"
+	"github.com/pratik-mahalle/infraudit/internal/services"
 )
 
 type AWSCredentials struct {

@@ -5,7 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"infraudit/backend/settings/routes"
+	"github.com/pratik-mahalle/infraudit/settings/routes"
 )
 
 func main() {

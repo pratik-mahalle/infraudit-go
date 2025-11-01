@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"infraudit/backend/internal/domain/anomaly"
-	"infraudit/backend/internal/pkg/errors"
+	"github.com/pratik-mahalle/infraudit/internal/domain/anomaly"
+	"github.com/pratik-mahalle/infraudit/internal/pkg/errors"
 )
 
 type AnomalyRepository struct {

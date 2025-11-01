@@ -3,8 +3,8 @@ package services
 import (
 	"context"
 
-	"infraudit/backend/internal/domain/user"
-	"infraudit/backend/internal/pkg/logger"
+	"github.com/pratik-mahalle/infraudit/internal/domain/user"
+	"github.com/pratik-mahalle/infraudit/internal/pkg/logger"
 )
 
 // UserService implements user.Service

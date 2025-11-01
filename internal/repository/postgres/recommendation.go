@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"infraudit/backend/internal/domain/recommendation"
-	"infraudit/backend/internal/pkg/errors"
+	"github.com/pratik-mahalle/infraudit/internal/domain/recommendation"
+	"github.com/pratik-mahalle/infraudit/internal/pkg/errors"
 )
 
 type RecommendationRepository struct {

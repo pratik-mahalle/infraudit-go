@@ -3,8 +3,8 @@ package services
 import (
 	"context"
 
-	"infraudit/backend/internal/domain/recommendation"
-	"infraudit/backend/internal/pkg/logger"
+	"github.com/pratik-mahalle/infraudit/internal/domain/recommendation"
+	"github.com/pratik-mahalle/infraudit/internal/pkg/logger"
 )
 
 // RecommendationService implements recommendation.Service

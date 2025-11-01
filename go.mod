@@ -1,4 +1,4 @@
-module infraudit/backend
+module github.com/pratik-mahalle/infraudit
 
 go 1.24.0
 

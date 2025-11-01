@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"infraudit/backend/internal/domain/drift"
+	"github.com/pratik-mahalle/infraudit/internal/domain/drift"
 )
 
 // DriftDetector analyzes configuration changes and identifies security drifts

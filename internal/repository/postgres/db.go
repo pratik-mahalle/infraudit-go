@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"infraudit/backend/internal/config"
+	"github.com/pratik-mahalle/infraudit/internal/config"
 	_ "modernc.org/sqlite"
 )
 

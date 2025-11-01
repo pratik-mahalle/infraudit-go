@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"infraudit/backend/internal/domain/vulnerability"
-	"infraudit/backend/internal/pkg/logger"
+	"github.com/pratik-mahalle/infraudit/internal/domain/vulnerability"
+	"github.com/pratik-mahalle/infraudit/internal/pkg/logger"
 )
 
 // CloudNativeScanner provides interface for cloud-native security scanners

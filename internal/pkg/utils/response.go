@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"infraudit/backend/internal/pkg/errors"
+	"github.com/pratik-mahalle/infraudit/internal/pkg/errors"
 )
 
 // SuccessResponse represents a successful API response

@@ -3,8 +3,8 @@ package services
 import (
 	"context"
 
-	"infraudit/backend/internal/domain/anomaly"
-	"infraudit/backend/internal/pkg/logger"
+	"github.com/pratik-mahalle/infraudit/internal/domain/anomaly"
+	"github.com/pratik-mahalle/infraudit/internal/pkg/logger"
 )
 
 // AnomalyService implements anomaly.Service
