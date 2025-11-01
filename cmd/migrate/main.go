@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"sort"
 
-	"infraaudit/backend/internal/config"
-	"infraaudit/backend/internal/repository/postgres"
+	"infraudit/backend/internal/config"
+	"infraudit/backend/internal/repository/postgres"
 )
 
 func main() {

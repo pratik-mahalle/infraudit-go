@@ -9,14 +9,14 @@ import (
 	"syscall"
 	"time"
 
-	"infraaudit/backend/internal/api/handlers"
-	"infraaudit/backend/internal/api/router"
-	"infraaudit/backend/internal/config"
-	"infraaudit/backend/internal/pkg/logger"
-	"infraaudit/backend/internal/pkg/validator"
-	"infraaudit/backend/internal/repository/postgres"
-	"infraaudit/backend/internal/scanners"
-	"infraaudit/backend/internal/services"
+	"infraudit/backend/internal/api/handlers"
+	"infraudit/backend/internal/api/router"
+	"infraudit/backend/internal/config"
+	"infraudit/backend/internal/pkg/logger"
+	"infraudit/backend/internal/pkg/validator"
+	"infraudit/backend/internal/repository/postgres"
+	"infraudit/backend/internal/scanners"
+	"infraudit/backend/internal/services"
 )
 
 func main() {

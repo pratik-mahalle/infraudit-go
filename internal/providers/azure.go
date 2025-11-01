@@ -10,7 +10,7 @@ import (
 	armresources "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources"
 	armstorage "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/storage/armstorage"
 
-	"infraaudit/backend/internal/services"
+	"infraudit/backend/internal/services"
 )
 
 type AzureCredentials struct {

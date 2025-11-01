@@ -6,8 +6,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	m "infraaudit/backend/settings/models"
-	u "infraaudit/backend/settings/utils"
+	m "infraudit/backend/settings/models"
+	u "infraudit/backend/settings/utils"
 )
 
 // Profile

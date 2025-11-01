@@ -5,7 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"infraaudit/backend/settings/routes"
+	"infraudit/backend/settings/routes"
 )
 
 func main() {

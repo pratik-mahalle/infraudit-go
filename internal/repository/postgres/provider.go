@@ -5,8 +5,8 @@ import (
 	"database/sql"
 	"time"
 
-	"infraaudit/backend/internal/domain/provider"
-	"infraaudit/backend/internal/pkg/errors"
+	"infraudit/backend/internal/domain/provider"
+	"infraudit/backend/internal/pkg/errors"
 )
 
 // ProviderRepository implements provider.Repository

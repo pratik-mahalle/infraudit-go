@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/pratik-mahalle/infraudit-go/pkg/client"
+	"infraudit/backend/pkg/client"
 )
 
 // Example demonstrates basic usage of the InfraAudit client

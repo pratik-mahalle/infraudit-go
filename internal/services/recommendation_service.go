@@ -3,8 +3,8 @@ package services
 import (
 	"context"
 
-	"infraaudit/backend/internal/domain/recommendation"
-	"infraaudit/backend/internal/pkg/logger"
+	"infraudit/backend/internal/domain/recommendation"
+	"infraudit/backend/internal/pkg/logger"
 )
 
 // RecommendationService implements recommendation.Service

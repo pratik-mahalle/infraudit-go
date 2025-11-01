@@ -3,7 +3,7 @@ package routes
 import (
 	"github.com/gin-gonic/gin"
 
-	c "infraaudit/backend/settings/controllers"
+	c "infraudit/backend/settings/controllers"
 )
 
 func RegisterSettingsRoutes(r *gin.Engine) {

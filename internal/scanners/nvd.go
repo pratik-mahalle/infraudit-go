@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"infraaudit/backend/internal/domain/vulnerability"
-	"infraaudit/backend/internal/pkg/logger"
+	"infraudit/backend/internal/domain/vulnerability"
+	"infraudit/backend/internal/pkg/logger"
 )
 
 // NVDScanner integrates with the National Vulnerability Database API

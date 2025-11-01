@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"infraaudit/backend/internal/domain/alert"
-	"infraaudit/backend/internal/pkg/errors"
+	"infraudit/backend/internal/domain/alert"
+	"infraudit/backend/internal/pkg/errors"
 )
 
 type AlertRepository struct {

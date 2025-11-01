@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"infraaudit/backend/internal/pkg/errors"
+	"infraudit/backend/internal/pkg/errors"
 )
 
 // SuccessResponse represents a successful API response

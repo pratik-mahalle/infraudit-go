@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"infraaudit/backend/internal/domain/drift"
-	"infraaudit/backend/internal/pkg/errors"
+	"infraudit/backend/internal/domain/drift"
+	"infraudit/backend/internal/pkg/errors"
 )
 
 type DriftRepository struct {

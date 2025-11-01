@@ -3,8 +3,8 @@ package services
 import (
 	"context"
 
-	"infraaudit/backend/internal/domain/user"
-	"infraaudit/backend/internal/pkg/logger"
+	"infraudit/backend/internal/domain/user"
+	"infraudit/backend/internal/pkg/logger"
 )
 
 // UserService implements user.Service

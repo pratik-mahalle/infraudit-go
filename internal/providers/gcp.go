@@ -12,7 +12,7 @@ import (
 	"google.golang.org/api/option"
 	computepb "google.golang.org/genproto/googleapis/cloud/compute/v1"
 
-	"infraaudit/backend/internal/services"
+	"infraudit/backend/internal/services"
 )
 
 type GCPCredentials struct {

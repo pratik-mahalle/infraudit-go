@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"infraaudit/backend/internal/domain/recommendation"
-	"infraaudit/backend/internal/pkg/errors"
+	"infraudit/backend/internal/domain/recommendation"
+	"infraudit/backend/internal/pkg/errors"
 )
 
 type RecommendationRepository struct {

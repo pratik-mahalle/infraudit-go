@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"infraaudit/backend/internal/domain/vulnerability"
-	"infraaudit/backend/internal/pkg/logger"
+	"infraudit/backend/internal/domain/vulnerability"
+	"infraudit/backend/internal/pkg/logger"
 )
 
 // CloudNativeScanner provides interface for cloud-native security scanners

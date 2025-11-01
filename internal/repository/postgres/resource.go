@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"infraaudit/backend/internal/domain/resource"
-	"infraaudit/backend/internal/pkg/errors"
+	"infraudit/backend/internal/domain/resource"
+	"infraudit/backend/internal/pkg/errors"
 )
 
 // ResourceRepository implements resource.Repository

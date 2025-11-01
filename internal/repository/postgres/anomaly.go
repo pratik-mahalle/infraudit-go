@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"infraaudit/backend/internal/domain/anomaly"
-	"infraaudit/backend/internal/pkg/errors"
+	"infraudit/backend/internal/domain/anomaly"
+	"infraudit/backend/internal/pkg/errors"
 )
 
 type AnomalyRepository struct {
