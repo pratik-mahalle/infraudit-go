@@ -15,6 +15,7 @@ import (
 	"infraaudit/backend/internal/pkg/logger"
 	"infraaudit/backend/internal/pkg/validator"
 	"infraaudit/backend/internal/repository/postgres"
+	"infraaudit/backend/internal/scanners"
 	"infraaudit/backend/internal/services"
 )
 
@@ -59,6 +60,11 @@ func main() {
 	driftRepo := postgres.NewDriftRepository(db)
 	anomalyRepo := postgres.NewAnomalyRepository(db)
 	baselineRepo := postgres.NewBaselineRepository(db)
+	vulnerabilityRepo := postgres.NewVulnerabilityRepository(db)
+
+	// Initialize scanners
+	trivyScanner := scanners.NewTrivyScanner(log, cfg.Scanner.TrivyPath, cfg.Scanner.TrivyCacheDir)
+	nvdScanner := scanners.NewNVDScanner(log, cfg.Scanner.NVDAPIKey)
 
 	// Initialize services
 	userService := services.NewUserService(userRepo, log)
@@ -69,6 +75,7 @@ func main() {
 	baselineService := services.NewBaselineService(baselineRepo, log)
 	driftService := services.NewDriftService(driftRepo, baselineRepo, resourceRepo, log)
 	anomalyService := services.NewAnomalyService(anomalyRepo, log)
+	vulnerabilityService := services.NewVulnerabilityService(vulnerabilityRepo, log, trivyScanner, nvdScanner)
 
 	// Initialize handlers
 	handlers := &router.Handlers{
@@ -81,6 +88,7 @@ func main() {
 		Drift:          handlers.NewDriftHandler(driftService, log, val),
 		Anomaly:        handlers.NewAnomalyHandler(anomalyService, log, val),
 		Baseline:       handlers.NewBaselineHandler(baselineService, log),
+		Vulnerability:  handlers.NewVulnerabilityHandler(vulnerabilityService, log, val),
 	}
 
 	// Setup router
