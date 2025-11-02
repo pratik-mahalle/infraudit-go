@@ -96,6 +96,7 @@ type LoggingConfig struct {
 // ProviderConfig contains cloud provider and integration configuration
 type ProviderConfig struct {
 	OpenAIAPIKey    string
+	GeminiAPIKey    string
 	SlackWebhookURL string
 	SlackChannel    string
 	StripeAPIKey    string
@@ -169,6 +170,7 @@ func Load() (*Config, error) {
 		},
 		Provider: ProviderConfig{
 			OpenAIAPIKey:    getEnv("OPENAI_API_KEY", ""),
+			GeminiAPIKey:    getEnv("GEMINI_API_KEY", ""),
 			SlackWebhookURL: getEnv("SLACK_WEBHOOK_URL", ""),
 			SlackChannel:    getEnv("SLACK_CHANNEL", "#alerts"),
 			StripeAPIKey:    getEnv("STRIPE_API_KEY", ""),
