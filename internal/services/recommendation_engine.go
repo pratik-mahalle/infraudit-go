@@ -195,13 +195,14 @@ Return ONLY a JSON array of recommendations. Be specific with savings estimates.
 func (e *RecommendationEngine) generateSecurityRecommendations(ctx context.Context, userID int64) error {
 	e.logger.Info("Generating security recommendations")
 
-	// Process all vulnerabilities with pagination
-	pageSize := 100
+	const (
+		pageSize  = 100
+		batchSize = 20
+	)
 	offset := 0
-	allVulns := make([]*vulnerability.Vulnerability, 0)
+	totalProcessed := 0
 
 	for {
-		// Get page of vulnerabilities
 		vulns, total, err := e.vulnRepo.ListWithPagination(ctx, userID, vulnerability.Filter{
 			Status: "open",
 		}, pageSize, offset)
@@ -213,9 +214,44 @@ func (e *RecommendationEngine) generateSecurityRecommendations(ctx context.Conte
 			break
 		}
 
-		allVulns = append(allVulns, vulns...)
+		totalProcessed += len(vulns)
 
-		// Check if we've fetched all vulnerabilities
+		for i := 0; i < len(vulns); i += batchSize {
+			end := i + batchSize
+			if end > len(vulns) {
+				end = len(vulns)
+			}
+
+			batch := vulns[i:end]
+
+			vulnData := make([]map[string]interface{}, 0, len(batch))
+			for _, v := range batch {
+				data := map[string]interface{}{
+					"cve_id":          v.CVEID,
+					"title":           v.Title,
+					"severity":        v.Severity,
+					"cvss_score":      v.CVSSScore,
+					"package_name":    v.PackageName,
+					"package_version": v.PackageVersion,
+					"fixed_version":   v.FixedVersion,
+					"resource_id":     v.ResourceID,
+					"resource_type":   v.ResourceType,
+				}
+				vulnData = append(vulnData, data)
+			}
+
+			response, err := e.geminiClient.AnalyzeVulnerabilitiesForRecommendations(ctx, vulnData)
+			if err != nil {
+				e.logger.ErrorWithErr(err, "Failed to analyze vulnerability batch")
+				continue
+			}
+
+			if err := e.parseAndSaveRecommendations(ctx, userID, response); err != nil {
+				e.logger.ErrorWithErr(err, "Failed to save vulnerability recommendations")
+				continue
+			}
+		}
+
 		if int64(offset+len(vulns)) >= total {
 			break
 		}
@@ -223,42 +259,15 @@ func (e *RecommendationEngine) generateSecurityRecommendations(ctx context.Conte
 		offset += len(vulns)
 	}
 
-	if len(allVulns) == 0 {
+	if totalProcessed == 0 {
 		e.logger.Info("No open vulnerabilities found, skipping vulnerability-based security recommendations")
 		// Still generate security recommendations from resource configurations
 		return e.generateResourceSecurityRecommendations(ctx, userID)
 	}
 
 	e.logger.WithFields(map[string]interface{}{
-		"total_vulnerabilities": len(allVulns),
+		"total_vulnerabilities": totalProcessed,
 	}).Info("Processing vulnerabilities for security recommendations")
-
-	// Prepare vulnerability data
-	vulnData := make([]map[string]interface{}, 0, len(allVulns))
-	for _, v := range allVulns {
-		data := map[string]interface{}{
-			"cve_id":          v.CVEID,
-			"title":           v.Title,
-			"severity":        v.Severity,
-			"cvss_score":      v.CVSSScore,
-			"package_name":    v.PackageName,
-			"package_version": v.PackageVersion,
-			"fixed_version":   v.FixedVersion,
-			"resource_id":     v.ResourceID,
-			"resource_type":   v.ResourceType,
-		}
-		vulnData = append(vulnData, data)
-	}
-
-	response, err := e.geminiClient.AnalyzeVulnerabilitiesForRecommendations(ctx, vulnData)
-	if err != nil {
-		return fmt.Errorf("failed to analyze vulnerabilities: %w", err)
-	}
-
-	// Parse and save recommendations
-	if err := e.parseAndSaveRecommendations(ctx, userID, response); err != nil {
-		return err
-	}
 
 	// Also generate security recommendations from resource configurations
 	return e.generateResourceSecurityRecommendations(ctx, userID)
@@ -268,13 +277,14 @@ func (e *RecommendationEngine) generateSecurityRecommendations(ctx context.Conte
 func (e *RecommendationEngine) generateResourceSecurityRecommendations(ctx context.Context, userID int64) error {
 	e.logger.Info("Generating resource security recommendations")
 
-	// Process all resources with pagination
-	pageSize := 1000
+	const (
+		pageSize  = 1000
+		batchSize = 10
+	)
 	offset := 0
-	allResources := make([]*resource.Resource, 0)
+	totalProcessed := 0
 
 	for {
-		// Get page of resources
 		resources, total, err := e.resourceRepo.List(ctx, userID, resource.Filter{}, pageSize, offset)
 		if err != nil {
 			return fmt.Errorf("failed to list resources: %w", err)
@@ -284,42 +294,38 @@ func (e *RecommendationEngine) generateResourceSecurityRecommendations(ctx conte
 			break
 		}
 
-		allResources = append(allResources, resources...)
+		totalProcessed += len(resources)
 
-		// Check if we've fetched all resources
-		if int64(offset+len(resources)) >= total {
-			break
-		}
+		for i := 0; i < len(resources); i += batchSize {
+			end := i + batchSize
+			if end > len(resources) {
+				end = len(resources)
+			}
 
-		offset += len(resources)
-	}
+			batch := resources[i:end]
 
-	if len(allResources) == 0 {
-		return nil
-	}
+			resourceData := make([]map[string]interface{}, 0, len(batch))
+			for _, res := range batch {
+				resourceData = append(resourceData, map[string]interface{}{
+					"id":            res.ResourceID,
+					"name":          res.Name,
+					"type":          res.Type,
+					"provider":      res.Provider,
+					"configuration": res.Configuration,
+				})
+			}
 
-	e.logger.WithFields(map[string]interface{}{
-		"total_resources": len(allResources),
-	}).Info("Processing resources for security recommendations")
+			jsonData, err := json.MarshalIndent(map[string]interface{}{
+				"resources": resourceData,
+			}, "", "  ")
+			if err != nil {
+				e.logger.ErrorWithErr(err, "Failed to marshal resources for security analysis")
+				continue
+			}
 
-	// Analyze each resource for security issues
-	for _, res := range allResources {
-		resourceData := map[string]interface{}{
-			"id":            res.ResourceID,
-			"name":          res.Name,
-			"type":          res.Type,
-			"provider":      res.Provider,
-			"configuration": res.Configuration,
-		}
+			prompt := fmt.Sprintf(`Analyze these cloud resources for security improvements:
 
-		jsonData, err := json.MarshalIndent(resourceData, "", "  ")
-		if err != nil {
-			continue
-		}
-
-		prompt := fmt.Sprintf(`Analyze this cloud resource for security improvements:
-
-Resource:
+Resources:
 %s
 
 Focus on:
@@ -338,22 +344,38 @@ Provide recommendations in JSON format:
   "savings": 0,
   "effort": "low|medium|high",
   "impact": "high|medium|low",
-  "resources": ["%s"]
+  "resources": ["resource_id"]
 }
 
-Return ONLY a JSON array of recommendations. Only include actual security issues found.`, string(jsonData), res.ResourceID)
+Return ONLY a JSON array of recommendations. Only include actual security issues found.`, string(jsonData))
 
-		response, err := e.geminiClient.GenerateContent(ctx, prompt)
-		if err != nil {
-			e.logger.ErrorWithErr(err, "Failed to analyze resource security")
-			continue
+			response, err := e.geminiClient.GenerateContent(ctx, prompt)
+			if err != nil {
+				e.logger.ErrorWithErr(err, "Failed to analyze resource security batch")
+				continue
+			}
+
+			if err := e.parseAndSaveRecommendations(ctx, userID, response); err != nil {
+				e.logger.ErrorWithErr(err, "Failed to save security recommendations")
+				continue
+			}
 		}
 
-		if err := e.parseAndSaveRecommendations(ctx, userID, response); err != nil {
-			e.logger.ErrorWithErr(err, "Failed to save security recommendations")
-			continue
+		if int64(offset+len(resources)) >= total {
+			break
 		}
+
+		offset += len(resources)
 	}
+
+	if totalProcessed == 0 {
+		e.logger.Info("No resources found, skipping resource security recommendations")
+		return nil
+	}
+
+	e.logger.WithFields(map[string]interface{}{
+		"total_resources": totalProcessed,
+	}).Info("Processed resources for security recommendations")
 
 	return nil
 }
@@ -362,13 +384,14 @@ Return ONLY a JSON array of recommendations. Only include actual security issues
 func (e *RecommendationEngine) generateComplianceRecommendations(ctx context.Context, userID int64) error {
 	e.logger.Info("Generating compliance recommendations")
 
-	// Process all drifts with pagination
-	pageSize := 100
+	const (
+		pageSize  = 100
+		batchSize = 20
+	)
 	offset := 0
-	allDrifts := make([]*drift.Drift, 0)
+	foundAny := false
 
 	for {
-		// Get page of drifts
 		drifts, total, err := e.driftRepo.ListWithPagination(ctx, userID, drift.Filter{
 			Status: "unresolved",
 		}, pageSize, offset)
@@ -380,7 +403,40 @@ func (e *RecommendationEngine) generateComplianceRecommendations(ctx context.Con
 			break
 		}
 
-		allDrifts = append(allDrifts, drifts...)
+		foundAny = true
+
+		// Process this page in batches
+		for i := 0; i < len(drifts); i += batchSize {
+			end := i + batchSize
+			if end > len(drifts) {
+				end = len(drifts)
+			}
+
+			batch := drifts[i:end]
+
+			driftData := make([]map[string]interface{}, 0, len(batch))
+			for _, d := range batch {
+				data := map[string]interface{}{
+					"resource_id": d.ResourceID,
+					"drift_type":  d.DriftType,
+					"severity":    d.Severity,
+					"details":     d.Details,
+					"detected_at": d.DetectedAt,
+				}
+				driftData = append(driftData, data)
+			}
+
+			response, err := e.geminiClient.AnalyzeDriftsForRecommendations(ctx, driftData)
+			if err != nil {
+				e.logger.ErrorWithErr(err, "Failed to analyze drift batch")
+				continue
+			}
+
+			if err := e.parseAndSaveRecommendations(ctx, userID, response); err != nil {
+				e.logger.ErrorWithErr(err, "Failed to save compliance recommendations")
+				continue
+			}
+		}
 
 		// Check if we've fetched all drifts
 		if int64(offset+len(drifts)) >= total {
@@ -390,34 +446,11 @@ func (e *RecommendationEngine) generateComplianceRecommendations(ctx context.Con
 		offset += len(drifts)
 	}
 
-	if len(allDrifts) == 0 {
+	if !foundAny {
 		e.logger.Info("No unresolved drifts found, skipping compliance recommendations")
-		return nil
 	}
 
-	e.logger.WithFields(map[string]interface{}{
-		"total_drifts": len(allDrifts),
-	}).Info("Processing drifts for compliance recommendations")
-
-	// Prepare drift data
-	driftData := make([]map[string]interface{}, 0, len(allDrifts))
-	for _, d := range allDrifts {
-		data := map[string]interface{}{
-			"resource_id": d.ResourceID,
-			"drift_type":  d.DriftType,
-			"severity":    d.Severity,
-			"details":     d.Details,
-			"detected_at": d.DetectedAt,
-		}
-		driftData = append(driftData, data)
-	}
-
-	response, err := e.geminiClient.AnalyzeDriftsForRecommendations(ctx, driftData)
-	if err != nil {
-		return fmt.Errorf("failed to analyze drifts: %w", err)
-	}
-
-	return e.parseAndSaveRecommendations(ctx, userID, response)
+	return nil
 }
 
 // parseAndSaveRecommendations parses AI response and saves recommendations

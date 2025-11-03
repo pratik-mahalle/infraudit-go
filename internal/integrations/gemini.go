@@ -56,7 +56,7 @@ func NewGeminiClient(apiKey string) *GeminiClient {
 	return &GeminiClient{
 		apiKey:  apiKey,
 		baseURL: "https://generativelanguage.googleapis.com/v1beta/models",
-		model:   "gemini-2.0-flash-exp", // Using Gemini 2.0 Flash (latest available)
+		model:   "gemini-2.5-pro", // Use stable GA Gemini model
 		httpClient: &http.Client{
 			Timeout: 60 * time.Second,
 		},
@@ -66,7 +66,7 @@ func NewGeminiClient(apiKey string) *GeminiClient {
 // GenerateContent generates content using the Gemini API
 func (c *GeminiClient) GenerateContent(ctx context.Context, prompt string) (string, error) {
 	if c.apiKey == "" {
-		return "", fmt.Errorf("Gemini API key is not configured")
+		return "", fmt.Errorf("gemini API key is not configured")
 	}
 
 	url := fmt.Sprintf("%s/%s:generateContent", c.baseURL, c.model)
@@ -86,39 +86,65 @@ func (c *GeminiClient) GenerateContent(ctx context.Context, prompt string) (stri
 		return "", fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonData))
-	if err != nil {
-		return "", fmt.Errorf("failed to create request: %w", err)
+	const (
+		maxRetries = 3
+		baseDelay  = 500 * time.Millisecond
+	)
+
+	var lastErr error
+
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(jsonData))
+		if err != nil {
+			return "", fmt.Errorf("failed to create request: %w", err)
+		}
+
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Goog-Api-Key", c.apiKey)
+
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			lastErr = fmt.Errorf("failed to make request (attempt %d): %w", attempt+1, err)
+		} else {
+			body, readErr := io.ReadAll(resp.Body)
+			resp.Body.Close()
+			if readErr != nil {
+				lastErr = fmt.Errorf("failed to read response (attempt %d): %w", attempt+1, readErr)
+			} else if resp.StatusCode == http.StatusOK {
+				var geminiResp GeminiResponse
+				if err := json.Unmarshal(body, &geminiResp); err != nil {
+					return "", fmt.Errorf("failed to unmarshal response: %w", err)
+				}
+
+				if len(geminiResp.Candidates) == 0 || len(geminiResp.Candidates[0].Content.Parts) == 0 {
+					return "", fmt.Errorf("no content generated")
+				}
+
+				return geminiResp.Candidates[0].Content.Parts[0].Text, nil
+			} else if resp.StatusCode == http.StatusTooManyRequests || (resp.StatusCode >= 500 && resp.StatusCode < 600) {
+				lastErr = fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
+			} else {
+				return "", fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
+			}
+		}
+
+		if attempt == maxRetries {
+			break
+		}
+
+		delay := baseDelay * time.Duration(1<<attempt)
+		select {
+		case <-time.After(delay):
+		case <-ctx.Done():
+			return "", ctx.Err()
+		}
 	}
 
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Goog-Api-Key", c.apiKey)
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("failed to make request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("failed to read response: %w", err)
+	if lastErr != nil {
+		return "", lastErr
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
-	}
-
-	var geminiResp GeminiResponse
-	if err := json.Unmarshal(body, &geminiResp); err != nil {
-		return "", fmt.Errorf("failed to unmarshal response: %w", err)
-	}
-
-	if len(geminiResp.Candidates) == 0 || len(geminiResp.Candidates[0].Content.Parts) == 0 {
-		return "", fmt.Errorf("no content generated")
-	}
-
-	return geminiResp.Candidates[0].Content.Parts[0].Text, nil
+	return "", fmt.Errorf("failed to generate content after %d attempts", maxRetries+1)
 }
 
 // AnalyzeResourceForRecommendations analyzes a resource and generates recommendations
