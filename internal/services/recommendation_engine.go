@@ -78,26 +78,50 @@ func (e *RecommendationEngine) GenerateRecommendations(ctx context.Context, user
 func (e *RecommendationEngine) generateCostOptimizationRecommendations(ctx context.Context, userID int64) error {
 	e.logger.Info("Generating cost optimization recommendations")
 
-	// Get all user resources
-	resources, _, err := e.resourceRepo.List(ctx, userID, resource.Filter{}, 1000, 0)
-	if err != nil {
-		return fmt.Errorf("failed to list resources: %w", err)
+	// Process all resources with pagination
+	pageSize := 1000
+	offset := 0
+	batchSize := 10
+	allResources := make([]*resource.Resource, 0)
+
+	for {
+		// Get page of resources
+		resources, total, err := e.resourceRepo.List(ctx, userID, resource.Filter{}, pageSize, offset)
+		if err != nil {
+			return fmt.Errorf("failed to list resources: %w", err)
+		}
+
+		if len(resources) == 0 {
+			break
+		}
+
+		allResources = append(allResources, resources...)
+
+		// Check if we've fetched all resources
+		if int64(offset+len(resources)) >= total {
+			break
+		}
+
+		offset += len(resources)
 	}
 
-	if len(resources) == 0 {
+	if len(allResources) == 0 {
 		e.logger.Info("No resources found, skipping cost optimization recommendations")
 		return nil
 	}
 
+	e.logger.WithFields(map[string]interface{}{
+		"total_resources": len(allResources),
+	}).Info("Processing resources for cost optimization")
+
 	// Analyze resources in batches
-	batchSize := 10
-	for i := 0; i < len(resources); i += batchSize {
+	for i := 0; i < len(allResources); i += batchSize {
 		end := i + batchSize
-		if end > len(resources) {
-			end = len(resources)
+		if end > len(allResources) {
+			end = len(allResources)
 		}
 
-		batch := resources[i:end]
+		batch := allResources[i:end]
 		if err := e.analyzeCostOptimizationBatch(ctx, userID, batch); err != nil {
 			e.logger.ErrorWithErr(err, "Failed to analyze cost optimization batch")
 			continue
@@ -171,23 +195,47 @@ Return ONLY a JSON array of recommendations. Be specific with savings estimates.
 func (e *RecommendationEngine) generateSecurityRecommendations(ctx context.Context, userID int64) error {
 	e.logger.Info("Generating security recommendations")
 
-	// Get open vulnerabilities
-	vulns, _, err := e.vulnRepo.ListWithPagination(ctx, userID, vulnerability.Filter{
-		Status: "open",
-	}, 100, 0)
-	if err != nil {
-		return fmt.Errorf("failed to list vulnerabilities: %w", err)
+	// Process all vulnerabilities with pagination
+	pageSize := 100
+	offset := 0
+	allVulns := make([]*vulnerability.Vulnerability, 0)
+
+	for {
+		// Get page of vulnerabilities
+		vulns, total, err := e.vulnRepo.ListWithPagination(ctx, userID, vulnerability.Filter{
+			Status: "open",
+		}, pageSize, offset)
+		if err != nil {
+			return fmt.Errorf("failed to list vulnerabilities: %w", err)
+		}
+
+		if len(vulns) == 0 {
+			break
+		}
+
+		allVulns = append(allVulns, vulns...)
+
+		// Check if we've fetched all vulnerabilities
+		if int64(offset+len(vulns)) >= total {
+			break
+		}
+
+		offset += len(vulns)
 	}
 
-	if len(vulns) == 0 {
+	if len(allVulns) == 0 {
 		e.logger.Info("No open vulnerabilities found, skipping vulnerability-based security recommendations")
 		// Still generate security recommendations from resource configurations
 		return e.generateResourceSecurityRecommendations(ctx, userID)
 	}
 
+	e.logger.WithFields(map[string]interface{}{
+		"total_vulnerabilities": len(allVulns),
+	}).Info("Processing vulnerabilities for security recommendations")
+
 	// Prepare vulnerability data
-	vulnData := make([]map[string]interface{}, 0, len(vulns))
-	for _, v := range vulns {
+	vulnData := make([]map[string]interface{}, 0, len(allVulns))
+	for _, v := range allVulns {
 		data := map[string]interface{}{
 			"cve_id":          v.CVEID,
 			"title":           v.Title,
@@ -220,17 +268,42 @@ func (e *RecommendationEngine) generateSecurityRecommendations(ctx context.Conte
 func (e *RecommendationEngine) generateResourceSecurityRecommendations(ctx context.Context, userID int64) error {
 	e.logger.Info("Generating resource security recommendations")
 
-	resources, _, err := e.resourceRepo.List(ctx, userID, resource.Filter{}, 50, 0)
-	if err != nil {
-		return fmt.Errorf("failed to list resources: %w", err)
+	// Process all resources with pagination
+	pageSize := 1000
+	offset := 0
+	allResources := make([]*resource.Resource, 0)
+
+	for {
+		// Get page of resources
+		resources, total, err := e.resourceRepo.List(ctx, userID, resource.Filter{}, pageSize, offset)
+		if err != nil {
+			return fmt.Errorf("failed to list resources: %w", err)
+		}
+
+		if len(resources) == 0 {
+			break
+		}
+
+		allResources = append(allResources, resources...)
+
+		// Check if we've fetched all resources
+		if int64(offset+len(resources)) >= total {
+			break
+		}
+
+		offset += len(resources)
 	}
 
-	if len(resources) == 0 {
+	if len(allResources) == 0 {
 		return nil
 	}
 
+	e.logger.WithFields(map[string]interface{}{
+		"total_resources": len(allResources),
+	}).Info("Processing resources for security recommendations")
+
 	// Analyze each resource for security issues
-	for _, res := range resources {
+	for _, res := range allResources {
 		resourceData := map[string]interface{}{
 			"id":            res.ResourceID,
 			"name":          res.Name,
@@ -289,22 +362,46 @@ Return ONLY a JSON array of recommendations. Only include actual security issues
 func (e *RecommendationEngine) generateComplianceRecommendations(ctx context.Context, userID int64) error {
 	e.logger.Info("Generating compliance recommendations")
 
-	// Get unresolved drifts
-	drifts, _, err := e.driftRepo.ListWithPagination(ctx, userID, drift.Filter{
-		Status: "unresolved",
-	}, 100, 0)
-	if err != nil {
-		return fmt.Errorf("failed to list drifts: %w", err)
+	// Process all drifts with pagination
+	pageSize := 100
+	offset := 0
+	allDrifts := make([]*drift.Drift, 0)
+
+	for {
+		// Get page of drifts
+		drifts, total, err := e.driftRepo.ListWithPagination(ctx, userID, drift.Filter{
+			Status: "unresolved",
+		}, pageSize, offset)
+		if err != nil {
+			return fmt.Errorf("failed to list drifts: %w", err)
+		}
+
+		if len(drifts) == 0 {
+			break
+		}
+
+		allDrifts = append(allDrifts, drifts...)
+
+		// Check if we've fetched all drifts
+		if int64(offset+len(drifts)) >= total {
+			break
+		}
+
+		offset += len(drifts)
 	}
 
-	if len(drifts) == 0 {
+	if len(allDrifts) == 0 {
 		e.logger.Info("No unresolved drifts found, skipping compliance recommendations")
 		return nil
 	}
 
+	e.logger.WithFields(map[string]interface{}{
+		"total_drifts": len(allDrifts),
+	}).Info("Processing drifts for compliance recommendations")
+
 	// Prepare drift data
-	driftData := make([]map[string]interface{}, 0, len(drifts))
-	for _, d := range drifts {
+	driftData := make([]map[string]interface{}, 0, len(allDrifts))
+	for _, d := range allDrifts {
 		data := map[string]interface{}{
 			"resource_id": d.ResourceID,
 			"drift_type":  d.DriftType,

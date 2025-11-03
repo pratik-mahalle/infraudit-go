@@ -69,7 +69,7 @@ func (c *GeminiClient) GenerateContent(ctx context.Context, prompt string) (stri
 		return "", fmt.Errorf("Gemini API key is not configured")
 	}
 
-	url := fmt.Sprintf("%s/%s:generateContent?key=%s", c.baseURL, c.model, c.apiKey)
+	url := fmt.Sprintf("%s/%s:generateContent", c.baseURL, c.model)
 
 	requestBody := GeminiRequest{
 		Contents: []GeminiContent{
@@ -92,6 +92,7 @@ func (c *GeminiClient) GenerateContent(ctx context.Context, prompt string) (stri
 	}
 
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Goog-Api-Key", c.apiKey)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
