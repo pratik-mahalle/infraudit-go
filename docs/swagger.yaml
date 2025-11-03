@@ -1,0 +1,2425 @@
+basePath: /api/v1
+definitions:
+  github_com_pratik-mahalle_infraudit_internal_api_dto.AlertDTO:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      resource:
+        type: string
+      severity:
+        type: string
+      status:
+        type: string
+      title:
+        type: string
+      type:
+        type: string
+    type: object
+  github_com_pratik-mahalle_infraudit_internal_api_dto.AnomalyDTO:
+    properties:
+      anomaly_type:
+        type: string
+      current_cost:
+        type: integer
+      detected_at:
+        type: string
+      id:
+        type: integer
+      percentage:
+        type: integer
+      previous_cost:
+        type: integer
+      resource_id:
+        type: string
+      severity:
+        type: string
+      status:
+        type: string
+    type: object
+  github_com_pratik-mahalle_infraudit_internal_api_dto.AuthResponse:
+    properties:
+      access_token:
+        type: string
+      refresh_token:
+        type: string
+      user:
+        $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_api_dto.UserDTO'
+    type: object
+  github_com_pratik-mahalle_infraudit_internal_api_dto.ConnectProviderRequest:
+    properties:
+      aws_access_key_id:
+        description: AWS credentials
+        type: string
+      aws_region:
+        type: string
+      aws_secret_access_key:
+        type: string
+      azure_client_id:
+        type: string
+      azure_client_secret:
+        type: string
+      azure_location:
+        type: string
+      azure_subscription_id:
+        type: string
+      azure_tenant_id:
+        description: Azure credentials
+        type: string
+      gcp_project_id:
+        description: GCP credentials
+        type: string
+      gcp_region:
+        type: string
+      gcp_service_account_json:
+        type: string
+      provider:
+        enum:
+        - aws
+        - gcp
+        - azure
+        type: string
+    required:
+    - provider
+    type: object
+  github_com_pratik-mahalle_infraudit_internal_api_dto.CreateAlertRequest:
+    properties:
+      description:
+        type: string
+      resource:
+        type: string
+      severity:
+        enum:
+        - critical
+        - high
+        - medium
+        - low
+        - info
+        type: string
+      status:
+        type: string
+      title:
+        type: string
+      type:
+        enum:
+        - security
+        - compliance
+        - performance
+        - cost
+        - availability
+        type: string
+    required:
+    - description
+    - severity
+    - title
+    - type
+    type: object
+  github_com_pratik-mahalle_infraudit_internal_api_dto.CreateAnomalyRequest:
+    properties:
+      anomaly_type:
+        type: string
+      current_cost:
+        type: integer
+      percentage:
+        type: integer
+      previous_cost:
+        type: integer
+      resource_id:
+        type: string
+      severity:
+        enum:
+        - critical
+        - high
+        - medium
+        - low
+        type: string
+      status:
+        type: string
+    required:
+    - anomaly_type
+    - current_cost
+    - percentage
+    - previous_cost
+    - resource_id
+    - severity
+    type: object
+  github_com_pratik-mahalle_infraudit_internal_api_dto.CreateDriftRequest:
+    properties:
+      details:
+        type: string
+      drift_type:
+        type: string
+      resource_id:
+        type: string
+      severity:
+        enum:
+        - critical
+        - high
+        - medium
+        - low
+        type: string
+      status:
+        type: string
+    required:
+    - details
+    - drift_type
+    - resource_id
+    - severity
+    type: object
+  github_com_pratik-mahalle_infraudit_internal_api_dto.CreateRecommendationRequest:
+    properties:
+      category:
+        type: string
+      description:
+        type: string
+      effort:
+        enum:
+        - low
+        - medium
+        - high
+        type: string
+      impact:
+        enum:
+        - high
+        - medium
+        - low
+        type: string
+      priority:
+        enum:
+        - critical
+        - high
+        - medium
+        - low
+        type: string
+      resources:
+        items:
+          type: string
+        type: array
+      savings:
+        type: number
+      title:
+        type: string
+      type:
+        type: string
+    required:
+    - category
+    - description
+    - effort
+    - impact
+    - priority
+    - title
+    - type
+    type: object
+  github_com_pratik-mahalle_infraudit_internal_api_dto.CreateResourceRequest:
+    properties:
+      name:
+        type: string
+      provider:
+        enum:
+        - aws
+        - gcp
+        - azure
+        type: string
+      region:
+        type: string
+      resource_id:
+        type: string
+      status:
+        type: string
+      type:
+        type: string
+    required:
+    - name
+    - provider
+    - region
+    - resource_id
+    - type
+    type: object
+  github_com_pratik-mahalle_infraudit_internal_api_dto.DriftDTO:
+    properties:
+      details:
+        type: string
+      detected_at:
+        type: string
+      drift_type:
+        type: string
+      id:
+        type: integer
+      resource_id:
+        type: string
+      severity:
+        type: string
+      status:
+        type: string
+    type: object
+  github_com_pratik-mahalle_infraudit_internal_api_dto.LoginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        minLength: 6
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  github_com_pratik-mahalle_infraudit_internal_api_dto.ProviderDTO:
+    properties:
+      is_connected:
+        type: boolean
+      last_synced:
+        type: string
+      provider:
+        type: string
+    type: object
+  github_com_pratik-mahalle_infraudit_internal_api_dto.ProviderStatusResponse:
+    properties:
+      is_connected:
+        type: boolean
+      last_synced:
+        type: string
+      message:
+        type: string
+      provider:
+        type: string
+      resource_count:
+        type: integer
+      status:
+        type: string
+    type: object
+  github_com_pratik-mahalle_infraudit_internal_api_dto.RecommendationDTO:
+    properties:
+      category:
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      effort:
+        type: string
+      id:
+        type: integer
+      impact:
+        type: string
+      priority:
+        type: string
+      resources:
+        items:
+          type: string
+        type: array
+      savings:
+        type: number
+      title:
+        type: string
+      type:
+        type: string
+    type: object
+  github_com_pratik-mahalle_infraudit_internal_api_dto.RefreshTokenRequest:
+    properties:
+      refresh_token:
+        type: string
+    required:
+    - refresh_token
+    type: object
+  github_com_pratik-mahalle_infraudit_internal_api_dto.RegisterRequest:
+    properties:
+      email:
+        type: string
+      password:
+        minLength: 8
+        type: string
+      username:
+        maxLength: 50
+        minLength: 3
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  github_com_pratik-mahalle_infraudit_internal_api_dto.ResourceDTO:
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+      provider:
+        type: string
+      region:
+        type: string
+      resource_id:
+        type: string
+      status:
+        type: string
+      type:
+        type: string
+    type: object
+  github_com_pratik-mahalle_infraudit_internal_api_dto.TriggerScanRequest:
+    properties:
+      provider:
+        type: string
+      resource_id:
+        type: string
+      scan_type:
+        enum:
+        - trivy
+        - nvd
+        - aws-inspector
+        - gcp-scc
+        - azure-sc
+        type: string
+      target:
+        description: Image name, file path, etc.
+        type: string
+    required:
+    - scan_type
+    type: object
+  github_com_pratik-mahalle_infraudit_internal_api_dto.UpdateAlertRequest:
+    properties:
+      description:
+        type: string
+      resource:
+        type: string
+      severity:
+        type: string
+      status:
+        type: string
+      title:
+        type: string
+      type:
+        type: string
+    type: object
+  github_com_pratik-mahalle_infraudit_internal_api_dto.UpdateAnomalyRequest:
+    properties:
+      anomaly_type:
+        type: string
+      current_cost:
+        type: integer
+      percentage:
+        type: integer
+      previous_cost:
+        type: integer
+      resource_id:
+        type: string
+      severity:
+        type: string
+      status:
+        type: string
+    type: object
+  github_com_pratik-mahalle_infraudit_internal_api_dto.UpdateDriftRequest:
+    properties:
+      details:
+        type: string
+      drift_type:
+        type: string
+      resource_id:
+        type: string
+      severity:
+        type: string
+      status:
+        type: string
+    type: object
+  github_com_pratik-mahalle_infraudit_internal_api_dto.UpdateRecommendationRequest:
+    properties:
+      category:
+        type: string
+      description:
+        type: string
+      effort:
+        type: string
+      impact:
+        type: string
+      priority:
+        type: string
+      resources:
+        items:
+          type: string
+        type: array
+      savings:
+        type: number
+      title:
+        type: string
+      type:
+        type: string
+    type: object
+  github_com_pratik-mahalle_infraudit_internal_api_dto.UpdateResourceRequest:
+    properties:
+      name:
+        type: string
+      region:
+        type: string
+      status:
+        type: string
+      type:
+        type: string
+    type: object
+  github_com_pratik-mahalle_infraudit_internal_api_dto.UpdateVulnerabilityStatusRequest:
+    properties:
+      status:
+        enum:
+        - open
+        - patched
+        - ignored
+        - false_positive
+        - accepted
+        type: string
+    required:
+    - status
+    type: object
+  github_com_pratik-mahalle_infraudit_internal_api_dto.UserDTO:
+    properties:
+      email:
+        type: string
+      full_name:
+        type: string
+      id:
+        type: integer
+      plan_type:
+        type: string
+      role:
+        type: string
+      username:
+        type: string
+    type: object
+  github_com_pratik-mahalle_infraudit_internal_api_dto.VulnerabilityDTO:
+    properties:
+      cve_id:
+        type: string
+      cvss_score:
+        type: number
+      cvss_vector:
+        type: string
+      description:
+        type: string
+      detected_at:
+        type: string
+      fixed_version:
+        type: string
+      id:
+        type: integer
+      last_modified_date:
+        type: string
+      package_name:
+        type: string
+      package_type:
+        type: string
+      package_version:
+        type: string
+      provider:
+        type: string
+      published_date:
+        type: string
+      remediation:
+        type: string
+      resolved_at:
+        type: string
+      resource_id:
+        type: string
+      resource_type:
+        type: string
+      scanner_type:
+        type: string
+      severity:
+        type: string
+      status:
+        type: string
+      title:
+        type: string
+      vulnerability_id:
+        type: string
+    type: object
+  github_com_pratik-mahalle_infraudit_internal_api_dto.VulnerabilityScanDTO:
+    properties:
+      completed_at:
+        type: string
+      created_at:
+        type: string
+      critical_count:
+        type: integer
+      error_message:
+        type: string
+      high_count:
+        type: integer
+      id:
+        type: integer
+      low_count:
+        type: integer
+      medium_count:
+        type: integer
+      resource_id:
+        type: string
+      scan_duration:
+        type: integer
+      scan_type:
+        type: string
+      scanner_version:
+        type: string
+      started_at:
+        type: string
+      status:
+        type: string
+      total_vulnerabilities:
+        type: integer
+    type: object
+  github_com_pratik-mahalle_infraudit_internal_domain_baseline.Baseline:
+    properties:
+      baseline_type:
+        description: manual, automatic, approved
+        type: string
+      configuration:
+        description: JSON string of resource configuration
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      provider:
+        type: string
+      resource_id:
+        type: string
+      resource_type:
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        type: integer
+    type: object
+  github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorDetail:
+    properties:
+      code:
+        type: string
+      details: {}
+      message:
+        type: string
+    type: object
+  github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse:
+    properties:
+      error:
+        $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorDetail'
+      success:
+        type: boolean
+    type: object
+  github_com_pratik-mahalle_infraudit_internal_pkg_utils.PaginatedResponse:
+    properties:
+      data: {}
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total_items:
+        type: integer
+      total_pages:
+        type: integer
+    type: object
+  github_com_pratik-mahalle_infraudit_internal_pkg_utils.SuccessResponse:
+    properties:
+      data: {}
+      message:
+        type: string
+      success:
+        type: boolean
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: support@infraaudit.com
+    name: API Support
+  description: |-
+    Cloud Infrastructure Auditing and Security Platform API
+
+    This API provides endpoints for managing cloud resources, security vulnerabilities,
+    drift detection, anomaly detection, and AI-powered recommendations across AWS, Azure, and GCP.
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  termsOfService: http://swagger.io/terms/
+  title: InfraAudit API
+  version: "1.0"
+paths:
+  /alerts:
+    get:
+      description: Get a paginated list of alerts with optional filtering
+      parameters:
+      - description: Filter by alert type
+        in: query
+        name: type
+        type: string
+      - description: Filter by severity
+        in: query
+        name: severity
+        type: string
+      - description: Filter by status
+        in: query
+        name: status
+        type: string
+      - description: Filter by resource
+        in: query
+        name: resource
+        type: string
+      - description: 'Page number (default: 1)'
+        in: query
+        name: page
+        type: integer
+      - description: 'Page size (default: 20, max: 100)'
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of alerts
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.PaginatedResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_api_dto.AlertDTO'
+                  type: array
+              type: object
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List alerts
+      tags:
+      - Alerts
+    post:
+      consumes:
+      - application/json
+      description: Create a new alert
+      parameters:
+      - description: Alert details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_api_dto.CreateAlertRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Alert created successfully
+          schema:
+            additionalProperties:
+              format: int64
+              type: integer
+            type: object
+        "400":
+          description: Invalid request or validation error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create alert
+      tags:
+      - Alerts
+  /alerts/{id}:
+    delete:
+      description: Delete an alert by ID
+      parameters:
+      - description: Alert ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Alert deleted successfully
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.SuccessResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete alert
+      tags:
+      - Alerts
+    get:
+      description: Get detailed information about a specific alert
+      parameters:
+      - description: Alert ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Alert details
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_api_dto.AlertDTO'
+        "404":
+          description: Alert not found
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get alert by ID
+      tags:
+      - Alerts
+    put:
+      consumes:
+      - application/json
+      description: Update an existing alert
+      parameters:
+      - description: Alert ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Alert update details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_api_dto.UpdateAlertRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Alert updated successfully
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.SuccessResponse'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update alert
+      tags:
+      - Alerts
+  /alerts/summary:
+    get:
+      description: Get summary statistics of alerts
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Alert summary
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get alert summary
+      tags:
+      - Alerts
+  /anomalies:
+    get:
+      description: Get a paginated list of cost anomalies with optional filtering
+      parameters:
+      - description: Filter by resource ID
+        in: query
+        name: resource_id
+        type: string
+      - description: Filter by anomaly type
+        in: query
+        name: type
+        type: string
+      - description: Filter by severity
+        in: query
+        name: severity
+        type: string
+      - description: Filter by status
+        in: query
+        name: status
+        type: string
+      - description: 'Page number (default: 1)'
+        in: query
+        name: page
+        type: integer
+      - description: 'Page size (default: 20, max: 100)'
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of anomalies
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.PaginatedResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_api_dto.AnomalyDTO'
+                  type: array
+              type: object
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List anomalies
+      tags:
+      - Anomalies
+    post:
+      consumes:
+      - application/json
+      description: Create a new cost anomaly record
+      parameters:
+      - description: Anomaly details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_api_dto.CreateAnomalyRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Anomaly created successfully
+          schema:
+            additionalProperties:
+              format: int64
+              type: integer
+            type: object
+        "400":
+          description: Invalid request or validation error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create anomaly
+      tags:
+      - Anomalies
+  /anomalies/{id}:
+    delete:
+      description: Delete a cost anomaly by ID
+      parameters:
+      - description: Anomaly ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Anomaly deleted successfully
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.SuccessResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete anomaly
+      tags:
+      - Anomalies
+    get:
+      description: Get detailed information about a specific cost anomaly
+      parameters:
+      - description: Anomaly ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Anomaly details
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_api_dto.AnomalyDTO'
+        "404":
+          description: Anomaly not found
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get anomaly by ID
+      tags:
+      - Anomalies
+    put:
+      consumes:
+      - application/json
+      description: Update an existing cost anomaly
+      parameters:
+      - description: Anomaly ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Anomaly update details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_api_dto.UpdateAnomalyRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Anomaly updated successfully
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.SuccessResponse'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update anomaly
+      tags:
+      - Anomalies
+  /anomalies/summary:
+    get:
+      description: Get summary statistics of cost anomalies
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Anomaly summary
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get anomaly summary
+      tags:
+      - Anomalies
+  /api/auth/logout:
+    post:
+      description: Logout current user
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.SuccessResponse'
+      summary: User logout
+      tags:
+      - auth
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticate user with email and password
+      parameters:
+      - description: Login credentials
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_api_dto.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successfully authenticated
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_api_dto.AuthResponse'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+        "401":
+          description: Invalid credentials
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+      summary: User login
+      tags:
+      - Auth
+  /auth/me:
+    get:
+      description: Get authenticated user's information
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: User information
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_api_dto.UserDTO'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get current user
+      tags:
+      - Auth
+  /auth/refresh:
+    post:
+      consumes:
+      - application/json
+      description: Refresh access token using refresh token
+      parameters:
+      - description: Refresh token
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_api_dto.RefreshTokenRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: New tokens generated
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_api_dto.AuthResponse'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+        "401":
+          description: Invalid refresh token
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+      summary: Refresh access token
+      tags:
+      - Auth
+  /auth/register:
+    post:
+      consumes:
+      - application/json
+      description: Register a new user account
+      parameters:
+      - description: Registration details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_api_dto.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: User successfully registered
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_api_dto.AuthResponse'
+        "400":
+          description: Invalid request or validation error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+      summary: User registration
+      tags:
+      - Auth
+  /baselines:
+    get:
+      description: Get a list of all baselines for the authenticated user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of baselines
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List baselines
+      tags:
+      - Baselines
+    post:
+      consumes:
+      - application/json
+      description: Create a new resource configuration baseline
+      parameters:
+      - description: Baseline details
+        in: body
+        name: request
+        required: true
+        schema:
+          properties:
+            baseline_type:
+              type: string
+            configuration:
+              type: string
+            description:
+              type: string
+            provider:
+              type: string
+            resource_id:
+              type: string
+            resource_type:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Baseline created successfully
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create baseline
+      tags:
+      - Baselines
+  /baselines/{id}:
+    delete:
+      description: Delete a baseline by ID
+      parameters:
+      - description: Baseline ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Baseline deleted successfully
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Invalid baseline ID
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete baseline
+      tags:
+      - Baselines
+  /baselines/resource/{resourceId}:
+    get:
+      description: Get the baseline configuration for a specific resource
+      parameters:
+      - description: Resource ID
+        in: path
+        name: resourceId
+        required: true
+        type: string
+      - description: 'Baseline type (default: approved)'
+        in: query
+        name: type
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Baseline details
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_domain_baseline.Baseline'
+        "404":
+          description: Baseline not found
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get baseline by resource ID
+      tags:
+      - Baselines
+  /drifts:
+    get:
+      description: Get a paginated list of configuration drifts with optional filtering
+      parameters:
+      - description: Filter by resource ID
+        in: query
+        name: resource_id
+        type: string
+      - description: Filter by drift type
+        in: query
+        name: drift_type
+        type: string
+      - description: Filter by severity
+        in: query
+        name: severity
+        type: string
+      - description: Filter by status
+        in: query
+        name: status
+        type: string
+      - description: 'Page number (default: 1)'
+        in: query
+        name: page
+        type: integer
+      - description: 'Page size (default: 20, max: 100)'
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of drifts
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.PaginatedResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_api_dto.DriftDTO'
+                  type: array
+              type: object
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List drifts
+      tags:
+      - Drifts
+    post:
+      consumes:
+      - application/json
+      description: Create a new configuration drift record
+      parameters:
+      - description: Drift details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_api_dto.CreateDriftRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Drift created successfully
+          schema:
+            additionalProperties:
+              format: int64
+              type: integer
+            type: object
+        "400":
+          description: Invalid request or validation error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create drift
+      tags:
+      - Drifts
+  /drifts/{id}:
+    delete:
+      description: Delete a configuration drift by ID
+      parameters:
+      - description: Drift ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Drift deleted successfully
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.SuccessResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete drift
+      tags:
+      - Drifts
+    get:
+      description: Get detailed information about a specific configuration drift
+      parameters:
+      - description: Drift ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Drift details
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_api_dto.DriftDTO'
+        "404":
+          description: Drift not found
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get drift by ID
+      tags:
+      - Drifts
+    put:
+      consumes:
+      - application/json
+      description: Update an existing configuration drift
+      parameters:
+      - description: Drift ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Drift update details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_api_dto.UpdateDriftRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Drift updated successfully
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.SuccessResponse'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update drift
+      tags:
+      - Drifts
+  /drifts/detect:
+    post:
+      description: Trigger drift detection for all user resources
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Drift detection completed successfully
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Detect drifts
+      tags:
+      - Drifts
+  /drifts/summary:
+    get:
+      description: Get summary statistics of configuration drifts
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Drift summary
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get drift summary
+      tags:
+      - Drifts
+  /health:
+    get:
+      description: Check if the application is alive
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Application is alive
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Liveness probe
+      tags:
+      - Health
+  /providers:
+    get:
+      description: Get a list of all connected cloud providers
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of connected providers
+          schema:
+            items:
+              $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_api_dto.ProviderDTO'
+            type: array
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List connected providers
+      tags:
+      - Providers
+  /providers/{provider}:
+    delete:
+      description: Disconnect a cloud provider and remove stored credentials
+      parameters:
+      - description: Provider type (aws, azure, gcp)
+        in: path
+        name: provider
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Provider disconnected successfully
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.SuccessResponse'
+        "400":
+          description: Invalid provider
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Disconnect provider
+      tags:
+      - Providers
+  /providers/{provider}/connect:
+    post:
+      consumes:
+      - application/json
+      description: Connect a cloud provider (AWS, Azure, or GCP) with credentials
+      parameters:
+      - description: Provider type (aws, azure, gcp)
+        in: path
+        name: provider
+        required: true
+        type: string
+      - description: Provider credentials
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_api_dto.ConnectProviderRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Provider connected successfully
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.SuccessResponse'
+        "400":
+          description: Invalid request or validation error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Connect cloud provider
+      tags:
+      - Providers
+  /providers/{provider}/sync:
+    post:
+      description: Sync resources from a connected cloud provider
+      parameters:
+      - description: Provider type (aws, azure, gcp)
+        in: path
+        name: provider
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Provider sync initiated
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.SuccessResponse'
+        "400":
+          description: Invalid provider or not connected
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Sync provider resources
+      tags:
+      - Providers
+  /providers/status:
+    get:
+      description: Get the sync status and resource counts for all providers
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Provider sync statuses
+          schema:
+            items:
+              $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_api_dto.ProviderStatusResponse'
+            type: array
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get provider sync status
+      tags:
+      - Providers
+  /readyz:
+    get:
+      description: Check if the application is ready to serve requests
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Application is ready
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "503":
+          description: Service unavailable
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+      summary: Readiness probe
+      tags:
+      - Health
+  /recommendations:
+    get:
+      description: Get a paginated list of recommendations with optional filtering
+      parameters:
+      - description: Filter by recommendation type
+        in: query
+        name: type
+        type: string
+      - description: Filter by priority
+        in: query
+        name: priority
+        type: string
+      - description: Filter by category
+        in: query
+        name: category
+        type: string
+      - description: 'Page number (default: 1)'
+        in: query
+        name: page
+        type: integer
+      - description: 'Page size (default: 20, max: 100)'
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of recommendations
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.PaginatedResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_api_dto.RecommendationDTO'
+                  type: array
+              type: object
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List recommendations
+      tags:
+      - Recommendations
+    post:
+      consumes:
+      - application/json
+      description: Create a new recommendation
+      parameters:
+      - description: Recommendation details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_api_dto.CreateRecommendationRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Recommendation created successfully
+          schema:
+            additionalProperties:
+              format: int64
+              type: integer
+            type: object
+        "400":
+          description: Invalid request or validation error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create recommendation
+      tags:
+      - Recommendations
+  /recommendations/{id}:
+    delete:
+      description: Delete a recommendation by ID
+      parameters:
+      - description: Recommendation ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Recommendation deleted successfully
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.SuccessResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete recommendation
+      tags:
+      - Recommendations
+    get:
+      description: Get detailed information about a specific recommendation
+      parameters:
+      - description: Recommendation ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Recommendation details
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_api_dto.RecommendationDTO'
+        "404":
+          description: Recommendation not found
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get recommendation by ID
+      tags:
+      - Recommendations
+    put:
+      consumes:
+      - application/json
+      description: Update an existing recommendation
+      parameters:
+      - description: Recommendation ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Recommendation update details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_api_dto.UpdateRecommendationRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Recommendation updated successfully
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.SuccessResponse'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update recommendation
+      tags:
+      - Recommendations
+  /recommendations/generate:
+    post:
+      description: Trigger the generation of new recommendations based on current
+        resources
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Recommendations generated successfully
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.SuccessResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Generate recommendations
+      tags:
+      - Recommendations
+  /recommendations/savings:
+    get:
+      description: Get total potential cost savings from all recommendations
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Total savings amount
+          schema:
+            additionalProperties:
+              format: float64
+              type: number
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get total savings
+      tags:
+      - Recommendations
+  /resources:
+    get:
+      description: Get a paginated list of cloud resources
+      parameters:
+      - description: Filter by provider (aws, azure, gcp)
+        in: query
+        name: provider
+        type: string
+      - description: Filter by resource type
+        in: query
+        name: type
+        type: string
+      - description: Filter by region
+        in: query
+        name: region
+        type: string
+      - description: Filter by status
+        in: query
+        name: status
+        type: string
+      - description: 'Page number (default: 1)'
+        in: query
+        name: page
+        type: integer
+      - description: 'Page size (default: 20, max: 100)'
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of resources
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.PaginatedResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_api_dto.ResourceDTO'
+                  type: array
+              type: object
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List resources
+      tags:
+      - Resources
+    post:
+      consumes:
+      - application/json
+      description: Create a new cloud resource
+      parameters:
+      - description: Resource details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_api_dto.CreateResourceRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Resource created successfully
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Invalid request or validation error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create resource
+      tags:
+      - Resources
+  /resources/{id}:
+    delete:
+      description: Delete a cloud resource by ID
+      parameters:
+      - description: Resource ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Resource deleted successfully
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.SuccessResponse'
+        "404":
+          description: Resource not found
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete resource
+      tags:
+      - Resources
+    get:
+      description: Get detailed information about a specific cloud resource
+      parameters:
+      - description: Resource ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Resource details
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_api_dto.ResourceDTO'
+        "404":
+          description: Resource not found
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get resource by ID
+      tags:
+      - Resources
+    put:
+      consumes:
+      - application/json
+      description: Update an existing cloud resource
+      parameters:
+      - description: Resource ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Resource update details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_api_dto.UpdateResourceRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Resource updated successfully
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.SuccessResponse'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+        "404":
+          description: Resource not found
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update resource
+      tags:
+      - Resources
+  /vulnerabilities:
+    get:
+      description: Get a paginated list of vulnerabilities with optional filtering
+      parameters:
+      - description: Filter by severity
+        in: query
+        name: severity
+        type: string
+      - description: Filter by status
+        in: query
+        name: status
+        type: string
+      - description: Filter by provider
+        in: query
+        name: provider
+        type: string
+      - description: Filter by resource ID
+        in: query
+        name: resource_id
+        type: string
+      - description: Filter by resource type
+        in: query
+        name: resource_type
+        type: string
+      - description: Filter by scanner type
+        in: query
+        name: scanner_type
+        type: string
+      - description: Filter by CVE ID
+        in: query
+        name: cve_id
+        type: string
+      - description: Minimum CVSS score
+        in: query
+        name: min_cvss
+        type: number
+      - description: Maximum CVSS score
+        in: query
+        name: max_cvss
+        type: number
+      - description: 'Page number (default: 1)'
+        in: query
+        name: page
+        type: integer
+      - description: 'Page size (default: 20, max: 100)'
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of vulnerabilities
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.PaginatedResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_api_dto.VulnerabilityDTO'
+                  type: array
+              type: object
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List vulnerabilities
+      tags:
+      - Vulnerabilities
+  /vulnerabilities/{id}:
+    delete:
+      description: Delete a vulnerability by ID
+      parameters:
+      - description: Vulnerability ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Vulnerability deleted successfully
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete vulnerability
+      tags:
+      - Vulnerabilities
+    get:
+      description: Get detailed information about a specific vulnerability
+      parameters:
+      - description: Vulnerability ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Vulnerability details
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_api_dto.VulnerabilityDTO'
+        "404":
+          description: Vulnerability not found
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get vulnerability by ID
+      tags:
+      - Vulnerabilities
+  /vulnerabilities/{id}/status:
+    put:
+      consumes:
+      - application/json
+      description: Update the status of a specific vulnerability
+      parameters:
+      - description: Vulnerability ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Status update
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_api_dto.UpdateVulnerabilityStatusRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Status updated successfully
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid request or validation error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update vulnerability status
+      tags:
+      - Vulnerabilities
+  /vulnerabilities/resource/{resourceId}:
+    get:
+      description: Get all vulnerabilities for a specific resource
+      parameters:
+      - description: Resource ID
+        in: path
+        name: resourceId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of resource vulnerabilities
+          schema:
+            items:
+              $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_api_dto.VulnerabilityDTO'
+            type: array
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get vulnerabilities by resource
+      tags:
+      - Vulnerabilities
+  /vulnerabilities/scan:
+    post:
+      consumes:
+      - application/json
+      description: Trigger a vulnerability scan using specified scanner type
+      parameters:
+      - description: Scan configuration
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_api_dto.TriggerScanRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Scan triggered successfully
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid request or validation error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Trigger vulnerability scan
+      tags:
+      - Vulnerabilities
+  /vulnerabilities/scans:
+    get:
+      description: Get a paginated list of vulnerability scans with optional filtering
+      parameters:
+      - description: Filter by scan type
+        in: query
+        name: scan_type
+        type: string
+      - description: Filter by status
+        in: query
+        name: status
+        type: string
+      - description: Filter by resource ID
+        in: query
+        name: resource_id
+        type: string
+      - description: 'Page number (default: 1)'
+        in: query
+        name: page
+        type: integer
+      - description: 'Page size (default: 20, max: 100)'
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of scans
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.PaginatedResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_api_dto.VulnerabilityScanDTO'
+                  type: array
+              type: object
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List vulnerability scans
+      tags:
+      - Vulnerabilities
+  /vulnerabilities/scans/{id}:
+    get:
+      description: Get detailed information about a specific vulnerability scan
+      parameters:
+      - description: Scan ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Scan details
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_api_dto.VulnerabilityScanDTO'
+        "404":
+          description: Scan not found
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get vulnerability scan by ID
+      tags:
+      - Vulnerabilities
+  /vulnerabilities/summary:
+    get:
+      description: Get summary statistics of vulnerabilities
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Vulnerability summary
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get vulnerability summary
+      tags:
+      - Vulnerabilities
+  /vulnerabilities/top:
+    get:
+      description: Get the top N vulnerabilities by severity
+      parameters:
+      - description: 'Number of vulnerabilities to return (default: 10, max: 100)'
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of top vulnerabilities
+          schema:
+            items:
+              $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_api_dto.VulnerabilityDTO'
+            type: array
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_pratik-mahalle_infraudit_internal_pkg_utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get top vulnerabilities
+      tags:
+      - Vulnerabilities
+securityDefinitions:
+  BearerAuth:
+    description: Type "Bearer" followed by a space and JWT token.
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
+tags:
+- description: Authentication and authorization endpoints
+  name: Auth
+- description: Cloud resource management
+  name: Resources
+- description: Cloud provider connections (AWS, Azure, GCP)
+  name: Providers
+- description: Alert management
+  name: Alerts
+- description: AI-powered recommendations for cost and security optimization
+  name: Recommendations
+- description: Infrastructure drift detection
+  name: Drifts
+- description: Anomaly detection and monitoring
+  name: Anomalies
+- description: Resource baseline management
+  name: Baselines
+- description: Security vulnerability scanning and management
+  name: Vulnerabilities

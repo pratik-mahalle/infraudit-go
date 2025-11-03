@@ -18,7 +18,58 @@ import (
 	"github.com/pratik-mahalle/infraudit/internal/repository/postgres"
 	"github.com/pratik-mahalle/infraudit/internal/scanners"
 	"github.com/pratik-mahalle/infraudit/internal/services"
+
+	_ "github.com/pratik-mahalle/infraudit/docs" // Swagger docs
 )
+
+// @title InfraAudit API
+// @version 1.0
+// @description Cloud Infrastructure Auditing and Security Platform API
+// @description
+// @description This API provides endpoints for managing cloud resources, security vulnerabilities,
+// @description drift detection, anomaly detection, and AI-powered recommendations across AWS, Azure, and GCP.
+// @termsOfService http://swagger.io/terms/
+
+// @contact.name API Support
+// @contact.email support@infraaudit.com
+
+// @license.name MIT
+// @license.url https://opensource.org/licenses/MIT
+
+// @host localhost:8080
+// @BasePath /api/v1
+
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description Type "Bearer" followed by a space and JWT token.
+
+// @tag.name Auth
+// @tag.description Authentication and authorization endpoints
+
+// @tag.name Resources
+// @tag.description Cloud resource management
+
+// @tag.name Providers
+// @tag.description Cloud provider connections (AWS, Azure, GCP)
+
+// @tag.name Alerts
+// @tag.description Alert management
+
+// @tag.name Recommendations
+// @tag.description AI-powered recommendations for cost and security optimization
+
+// @tag.name Drifts
+// @tag.description Infrastructure drift detection
+
+// @tag.name Anomalies
+// @tag.description Anomaly detection and monitoring
+
+// @tag.name Baselines
+// @tag.description Resource baseline management
+
+// @tag.name Vulnerabilities
+// @tag.description Security vulnerability scanning and management
 
 func main() {
 	// Load configuration
