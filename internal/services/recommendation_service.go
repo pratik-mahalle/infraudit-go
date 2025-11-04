@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/pratik-mahalle/infraudit/internal/domain/recommendation"
 	"github.com/pratik-mahalle/infraudit/internal/pkg/logger"
@@ -10,13 +11,15 @@ import (
 // RecommendationService implements recommendation.Service
 type RecommendationService struct {
 	repo   recommendation.Repository
+	engine *RecommendationEngine
 	logger *logger.Logger
 }
 
 // NewRecommendationService creates a new recommendation service
-func NewRecommendationService(repo recommendation.Repository, log *logger.Logger) recommendation.Service {
+func NewRecommendationService(repo recommendation.Repository, engine *RecommendationEngine, log *logger.Logger) recommendation.Service {
 	return &RecommendationService{
 		repo:   repo,
+		engine: engine,
 		logger: log,
 	}
 }
@@ -121,13 +124,25 @@ func (s *RecommendationService) GetTotalSavings(ctx context.Context, userID int6
 	return s.repo.GetTotalSavings(ctx, userID)
 }
 
-// GenerateRecommendations generates recommendations for a user
+// GenerateRecommendations generates recommendations for a user using AI
 func (s *RecommendationService) GenerateRecommendations(ctx context.Context, userID int64) error {
-	// This would analyze resources and generate recommendations
-	// For now, it's a placeholder
 	s.logger.WithFields(map[string]interface{}{
 		"user_id": userID,
-	}).Info("Generating recommendations")
+	}).Info("Generating recommendations using AI engine")
+
+	if s.engine == nil {
+		s.logger.Warn("Recommendation engine is not configured")
+		return fmt.Errorf("recommendation engine is not available")
+	}
+
+	if err := s.engine.GenerateRecommendations(ctx, userID); err != nil {
+		s.logger.ErrorWithErr(err, "Failed to generate recommendations")
+		return fmt.Errorf("failed to generate recommendations: %w", err)
+	}
+
+	s.logger.WithFields(map[string]interface{}{
+		"user_id": userID,
+	}).Info("Successfully generated recommendations")
 
 	return nil
 }

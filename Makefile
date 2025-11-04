@@ -3,7 +3,7 @@ PKG=./...
 BIN=bin/$(APP)
 DOCKER_IMAGE=infraaudit-go
 
-.PHONY: build run clean docker-build docker-run deps fmt lint
+.PHONY: build run clean docker-build docker-run deps fmt lint swagger swagger-install
 
 build:
 	GO111MODULE=on CGO_ENABLED=0 go build -o $(BIN) ./cmd/api
@@ -38,3 +38,18 @@ DATA_DIR?=$(PWD)/data
 docker-run:
 	mkdir -p $(DATA_DIR)
 	docker run --rm -p $(PORT):8080 -e API_ADDR=":8080" -e DB_PATH="/data/data.db" -v $(DATA_DIR):/data $(DOCKER_IMAGE):latest
+
+# Swagger documentation
+swagger-install:
+	@which swag > /dev/null || (echo "Installing swag..." && go install github.com/swaggo/swag/cmd/swag@latest)
+
+swagger: swagger-install
+	@echo "Generating Swagger documentation..."
+	@swag init -g cmd/api/main.go -o docs --parseDependency --parseInternal
+	@echo "Swagger docs generated successfully!"
+
+swagger-validate: swagger-install
+	@echo "Validating Swagger documentation is up to date..."
+	@swag init -g cmd/api/main.go -o docs --parseDependency --parseInternal
+	@git diff --exit-code docs/ || (echo "ERROR: Swagger docs are out of date. Run 'make swagger' and commit the changes." && exit 1)
+	@echo "Swagger docs are up to date!"

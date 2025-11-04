@@ -12,12 +12,64 @@ import (
 	"github.com/pratik-mahalle/infraudit/internal/api/handlers"
 	"github.com/pratik-mahalle/infraudit/internal/api/router"
 	"github.com/pratik-mahalle/infraudit/internal/config"
+	"github.com/pratik-mahalle/infraudit/internal/integrations"
 	"github.com/pratik-mahalle/infraudit/internal/pkg/logger"
 	"github.com/pratik-mahalle/infraudit/internal/pkg/validator"
 	"github.com/pratik-mahalle/infraudit/internal/repository/postgres"
 	"github.com/pratik-mahalle/infraudit/internal/scanners"
 	"github.com/pratik-mahalle/infraudit/internal/services"
+
+	_ "github.com/pratik-mahalle/infraudit/docs" // Swagger docs
 )
+
+// @title InfraAudit API
+// @version 1.0
+// @description Cloud Infrastructure Auditing and Security Platform API
+// @description
+// @description This API provides endpoints for managing cloud resources, security vulnerabilities,
+// @description drift detection, anomaly detection, and AI-powered recommendations across AWS, Azure, and GCP.
+// @termsOfService http://swagger.io/terms/
+
+// @contact.name API Support
+// @contact.email support@infraaudit.com
+
+// @license.name MIT
+// @license.url https://opensource.org/licenses/MIT
+
+// @host localhost:8080
+// @BasePath /api/v1
+
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description Type "Bearer" followed by a space and JWT token.
+
+// @tag.name Auth
+// @tag.description Authentication and authorization endpoints
+
+// @tag.name Resources
+// @tag.description Cloud resource management
+
+// @tag.name Providers
+// @tag.description Cloud provider connections (AWS, Azure, GCP)
+
+// @tag.name Alerts
+// @tag.description Alert management
+
+// @tag.name Recommendations
+// @tag.description AI-powered recommendations for cost and security optimization
+
+// @tag.name Drifts
+// @tag.description Infrastructure drift detection
+
+// @tag.name Anomalies
+// @tag.description Anomaly detection and monitoring
+
+// @tag.name Baselines
+// @tag.description Resource baseline management
+
+// @tag.name Vulnerabilities
+// @tag.description Security vulnerability scanning and management
 
 func main() {
 	// Load configuration
@@ -66,16 +118,42 @@ func main() {
 	trivyScanner := scanners.NewTrivyScanner(log, cfg.Scanner.TrivyPath, cfg.Scanner.TrivyCacheDir)
 	nvdScanner := scanners.NewNVDScanner(log, cfg.Scanner.NVDAPIKey)
 
+	// Initialize AI integrations
+	var geminiClient *integrations.GeminiClient
+	var recommendationEngine *services.RecommendationEngine
+
+	if cfg.Provider.GeminiAPIKey != "" {
+		geminiClient = integrations.NewGeminiClient(cfg.Provider.GeminiAPIKey)
+		log.Info("Gemini AI client initialized")
+	} else {
+		log.Warn("Gemini API key not configured - recommendation generation will be disabled")
+	}
+
 	// Initialize services
 	userService := services.NewUserService(userRepo, log)
 	resourceService := services.NewResourceService(resourceRepo, log)
 	providerService := services.NewProviderService(providerRepo, resourceRepo, log)
 	alertService := services.NewAlertService(alertRepo, log)
-	recommendationService := services.NewRecommendationService(recommendationRepo, log)
 	baselineService := services.NewBaselineService(baselineRepo, log)
 	driftService := services.NewDriftService(driftRepo, baselineRepo, resourceRepo, log)
 	anomalyService := services.NewAnomalyService(anomalyRepo, log)
 	vulnerabilityService := services.NewVulnerabilityService(vulnerabilityRepo, log, trivyScanner, nvdScanner)
+
+	// Initialize recommendation engine (if Gemini is available)
+	if geminiClient != nil {
+		recommendationEngine = services.NewRecommendationEngine(
+			geminiClient,
+			resourceRepo,
+			vulnerabilityRepo,
+			driftRepo,
+			recommendationRepo,
+			log,
+		)
+		log.Info("Recommendation engine initialized")
+	}
+
+	// Initialize recommendation service
+	recommendationService := services.NewRecommendationService(recommendationRepo, recommendationEngine, log)
 
 	// Initialize handlers
 	handlers := &router.Handlers{

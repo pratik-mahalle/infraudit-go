@@ -25,6 +25,7 @@ const (
 	TypePerformanceOptimization = "performance_optimization"
 	TypeSecurityImprovement     = "security_improvement"
 	TypeReliabilityImprovement  = "reliability_improvement"
+	TypeCompliance              = "compliance"
 )
 
 // Priority levels
