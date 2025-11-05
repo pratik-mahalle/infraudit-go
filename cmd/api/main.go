@@ -71,6 +71,9 @@ import (
 // @tag.name Vulnerabilities
 // @tag.description Security vulnerability scanning and management
 
+// @tag.name IaC
+// @tag.description Infrastructure as Code parsing and drift detection
+
 func main() {
 	// Load configuration
 	cfg, err := config.Load()
@@ -113,6 +116,7 @@ func main() {
 	anomalyRepo := postgres.NewAnomalyRepository(db)
 	baselineRepo := postgres.NewBaselineRepository(db)
 	vulnerabilityRepo := postgres.NewVulnerabilityRepository(db)
+	iacRepo := postgres.NewIaCRepository(db)
 
 	// Initialize scanners
 	trivyScanner := scanners.NewTrivyScanner(log, cfg.Scanner.TrivyPath, cfg.Scanner.TrivyCacheDir)
@@ -138,6 +142,7 @@ func main() {
 	driftService := services.NewDriftService(driftRepo, baselineRepo, resourceRepo, log)
 	anomalyService := services.NewAnomalyService(anomalyRepo, log)
 	vulnerabilityService := services.NewVulnerabilityService(vulnerabilityRepo, log, trivyScanner, nvdScanner)
+	iacService := services.NewIaCService(iacRepo, resourceService.(*services.ResourceService), driftService.(*services.DriftService))
 
 	// Initialize recommendation engine (if Gemini is available)
 	if geminiClient != nil {
@@ -167,6 +172,7 @@ func main() {
 		Anomaly:        handlers.NewAnomalyHandler(anomalyService, log, val),
 		Baseline:       handlers.NewBaselineHandler(baselineService, log),
 		Vulnerability:  handlers.NewVulnerabilityHandler(vulnerabilityService, log, val),
+		IaC:            handlers.NewIaCHandler(iacService, log, val),
 	}
 
 	// Setup router
