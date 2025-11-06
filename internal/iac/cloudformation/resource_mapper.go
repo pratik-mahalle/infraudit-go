@@ -1,7 +1,7 @@
 package cloudformation
 
 import (
-	"fmt"
+	"reflect"
 
 	"github.com/pratik-mahalle/infraudit/internal/domain/iac"
 )
@@ -240,5 +240,5 @@ func (m *ResourceMapper) CompareResources(cfConfig, actualConfig map[string]inte
 
 // valuesEqual compares two values for equality
 func (m *ResourceMapper) valuesEqual(v1, v2 interface{}) bool {
-	return fmt.Sprintf("%v", v1) == fmt.Sprintf("%v", v2)
+	return reflect.DeepEqual(v1, v2)
 }

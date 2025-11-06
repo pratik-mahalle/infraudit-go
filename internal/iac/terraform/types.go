@@ -118,11 +118,17 @@ type ParseResult struct {
 
 // HasErrors returns true if there are any errors
 func (r *ParseResult) HasErrors() bool {
+	if r == nil {
+		return false
+	}
 	return len(r.Errors) > 0 || r.Diagnostics.HasErrors()
 }
 
 // ErrorMessages returns all error messages
 func (r *ParseResult) ErrorMessages() []string {
+	if r == nil {
+		return nil
+	}
 	messages := make([]string, 0)
 	for _, err := range r.Errors {
 		messages = append(messages, err.Error())

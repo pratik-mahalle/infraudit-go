@@ -446,8 +446,8 @@ func (p *Parser) parseBlockContent(body *hclsyntax.Body) (map[string]interface{}
 	for name, attr := range body.Attributes {
 		value, err := p.evalExpression(attr.Expr)
 		if err != nil {
-			// Store the expression as string if evaluation fails
-			result[name] = fmt.Sprintf("${%s}", string(attr.Expr.Range().SliceBytes(body.SrcRange.SliceBytes([]byte{}))))
+			// Store a safe placeholder if evaluation fails
+			result[name] = "${expression}"
 			continue
 		}
 		result[name] = value

@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"time"
@@ -302,8 +303,35 @@ func (s *IaCService) extractCloudFormationResources(definition *iac.IaCDefinitio
 		return resources
 	}
 
-	// Similar extraction logic for CloudFormation
-	// This is a placeholder - actual implementation would need proper type conversion
+	// Extract resources array from parsed data
+	cfResourcesInterface, ok := definition.ParsedResources["resources"].([]interface{})
+	if !ok {
+		return resources
+	}
+
+	mapper := cfparser.NewResourceMapper()
+	cfResources := make([]cfparser.CloudFormationResource, 0, len(cfResourcesInterface))
+
+	// Reconstruct CloudFormationResource structs from maps
+	for _, resInterface := range cfResourcesInterface {
+		resMap, ok := resInterface.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		cfRes := s.mapToCloudFormationResource(resMap)
+		cfResources = append(cfResources, cfRes)
+	}
+
+	// Use resource mapper to convert to IaC resources
+	if len(cfResources) > 0 {
+		iacResources := mapper.MapToIaCResources(
+			&cfparser.ParsedCloudFormation{Resources: cfResources},
+			definition.ID,
+			definition.UserID,
+		)
+		resources = append(resources, iacResources...)
+	}
 
 	return resources
 }
@@ -316,8 +344,35 @@ func (s *IaCService) extractKubernetesResources(definition *iac.IaCDefinition) [
 		return resources
 	}
 
-	// Similar extraction logic for Kubernetes
-	// This is a placeholder - actual implementation would need proper type conversion
+	// Extract resources array from parsed data
+	k8sResourcesInterface, ok := definition.ParsedResources["resources"].([]interface{})
+	if !ok {
+		return resources
+	}
+
+	mapper := k8sparser.NewResourceMapper()
+	k8sResources := make([]k8sparser.KubernetesResource, 0, len(k8sResourcesInterface))
+
+	// Reconstruct KubernetesResource structs from maps
+	for _, resInterface := range k8sResourcesInterface {
+		resMap, ok := resInterface.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		k8sRes := s.mapToKubernetesResource(resMap)
+		k8sResources = append(k8sResources, k8sRes)
+	}
+
+	// Use resource mapper to convert to IaC resources
+	if len(k8sResources) > 0 {
+		iacResources := mapper.MapToIaCResources(
+			&k8sparser.ParsedKubernetes{Resources: k8sResources},
+			definition.ID,
+			definition.UserID,
+		)
+		resources = append(resources, iacResources...)
+	}
 
 	return resources
 }
@@ -327,65 +382,350 @@ func (s *IaCService) extractKubernetesResources(definition *iac.IaCDefinition) [
 func (s *IaCService) mapToTerraformResource(resMap map[string]interface{}) tfparser.TerraformResource {
 	tfRes := tfparser.TerraformResource{}
 
-	if typeVal, ok := resMap["Type"].(string); ok {
+	if typeVal, ok := resMap["type"].(string); ok {
 		tfRes.Type = typeVal
 	}
-	if name, ok := resMap["Name"].(string); ok {
+	if name, ok := resMap["name"].(string); ok {
 		tfRes.Name = name
 	}
-	if addr, ok := resMap["Address"].(string); ok {
+	if addr, ok := resMap["address"].(string); ok {
 		tfRes.Address = addr
 	}
-	if provider, ok := resMap["Provider"].(string); ok {
+	if provider, ok := resMap["provider"].(string); ok {
 		tfRes.Provider = provider
 	}
-	if config, ok := resMap["Configuration"].(map[string]interface{}); ok {
+	if config, ok := resMap["configuration"].(map[string]interface{}); ok {
 		tfRes.Configuration = config
 	}
 
 	return tfRes
 }
 
+// mapToCloudFormationResource converts a map to CloudFormationResource
+// This is a helper for type conversion
+func (s *IaCService) mapToCloudFormationResource(resMap map[string]interface{}) cfparser.CloudFormationResource {
+	cfRes := cfparser.CloudFormationResource{}
+
+	if logicalID, ok := resMap["logical_id"].(string); ok {
+		cfRes.LogicalID = logicalID
+	}
+	if typeVal, ok := resMap["type"].(string); ok {
+		cfRes.Type = typeVal
+	}
+	if provider, ok := resMap["provider"].(string); ok {
+		cfRes.Provider = provider
+	}
+	if properties, ok := resMap["properties"].(map[string]interface{}); ok {
+		cfRes.Properties = properties
+	}
+	if dependsOn, ok := resMap["depends_on"].([]interface{}); ok {
+		cfRes.DependsOn = make([]string, 0, len(dependsOn))
+		for _, dep := range dependsOn {
+			if depStr, ok := dep.(string); ok {
+				cfRes.DependsOn = append(cfRes.DependsOn, depStr)
+			}
+		}
+	}
+	if condition, ok := resMap["condition"].(string); ok {
+		cfRes.Condition = condition
+	}
+	if deletionPolicy, ok := resMap["deletion_policy"].(string); ok {
+		cfRes.DeletionPolicy = deletionPolicy
+	}
+
+	return cfRes
+}
+
+// mapToKubernetesResource converts a map to KubernetesResource
+// This is a helper for type conversion
+func (s *IaCService) mapToKubernetesResource(resMap map[string]interface{}) k8sparser.KubernetesResource {
+	k8sRes := k8sparser.KubernetesResource{}
+
+	if apiVersion, ok := resMap["api_version"].(string); ok {
+		k8sRes.APIVersion = apiVersion
+	}
+	if kind, ok := resMap["kind"].(string); ok {
+		k8sRes.Kind = kind
+	}
+	if name, ok := resMap["name"].(string); ok {
+		k8sRes.Name = name
+	}
+	if namespace, ok := resMap["namespace"].(string); ok {
+		k8sRes.Namespace = namespace
+	}
+	if labels, ok := resMap["labels"].(map[string]interface{}); ok {
+		k8sRes.Labels = make(map[string]string)
+		for key, val := range labels {
+			if strVal, ok := val.(string); ok {
+				k8sRes.Labels[key] = strVal
+			}
+		}
+	}
+	if annotations, ok := resMap["annotations"].(map[string]interface{}); ok {
+		k8sRes.Annotations = make(map[string]string)
+		for key, val := range annotations {
+			if strVal, ok := val.(string); ok {
+				k8sRes.Annotations[key] = strVal
+			}
+		}
+	}
+	if spec, ok := resMap["spec"].(map[string]interface{}); ok {
+		k8sRes.Spec = spec
+	}
+	if data, ok := resMap["data"].(map[string]interface{}); ok {
+		k8sRes.Data = data
+	}
+
+	return k8sRes
+}
+
 // compareResources compares IaC resources with actual deployed resources
 func (s *IaCService) compareResources(iacResources []*iac.IaCResource, actualResources interface{}, definition *iac.IaCDefinition) []*iac.IaCDriftResult {
 	drifts := make([]*iac.IaCDriftResult, 0)
 
-	// Create a map of actual resources for quick lookup
-	// This is a simplified approach - production would need more sophisticated matching
-	actualResourceMap := make(map[string]interface{})
+	// Type assert actualResources to []*resource.Resource
+	actualResourceList, ok := actualResources.([]*resource.Resource)
+	if !ok {
+		// If type assertion fails, log and return empty drifts
+		return drifts
+	}
 
-	// Check for missing resources (in IaC but not deployed)
+	// Build lookup map: key = "provider:type:name" -> actual resource
+	// This allows O(1) lookups when matching IaC resources
+	actualResourceMap := make(map[string]*resource.Resource)
+	for _, actualRes := range actualResourceList {
+		// Create multiple lookup keys for better matching chances
+		// Key format: "provider:type:name"
+		key := fmt.Sprintf("%s:%s:%s", actualRes.Provider, actualRes.Type, actualRes.Name)
+		actualResourceMap[key] = actualRes
+
+		// Also create a key with ResourceID for exact ID matching
+		if actualRes.ResourceID != "" {
+			idKey := fmt.Sprintf("%s:%s:%s", actualRes.Provider, actualRes.Type, actualRes.ResourceID)
+			actualResourceMap[idKey] = actualRes
+		}
+	}
+
+	// Track which actual resources have been matched to detect shadow resources later
+	matchedActualResources := make(map[string]bool)
+
+	// Check for missing and modified resources (in IaC)
 	for _, iacRes := range iacResources {
-		// Try to find matching actual resource
-		// For now, we'll create a "missing" drift for demonstration
-		drift := &iac.IaCDriftResult{
-			UserID:          definition.UserID,
-			IaCDefinitionID: definition.ID,
-			IaCResourceID:   &iacRes.ID,
-			DriftCategory:   iac.DriftCategoryMissing,
-			Status:          iac.DriftStatusDetected,
-			Details: map[string]interface{}{
-				"message": fmt.Sprintf("Resource %s defined in IaC but not found in deployed resources", iacRes.ResourceAddress),
-				"iac_resource": map[string]interface{}{
-					"type":    iacRes.ResourceType,
-					"name":    iacRes.ResourceName,
-					"address": iacRes.ResourceAddress,
-				},
-			},
+		// Try multiple matching strategies
+		var matchedResource *resource.Resource
+		var matchKey string
+
+		// Strategy 1: Match by provider:type:name
+		key1 := fmt.Sprintf("%s:%s:%s", iacRes.Provider, iacRes.ResourceType, iacRes.ResourceName)
+		if res, exists := actualResourceMap[key1]; exists {
+			matchedResource = res
+			matchKey = key1
 		}
 
-		severity := iac.SeverityMedium
-		drift.Severity = &severity
+		// Strategy 2: Try matching with resource address (last part after dot)
+		if matchedResource == nil && iacRes.ResourceAddress != "" {
+			// Extract name from address (e.g., "module.vpc.aws_instance.web" -> "web")
+			parts := splitResourceAddress(iacRes.ResourceAddress)
+			if len(parts) > 0 {
+				addressName := parts[len(parts)-1]
+				key2 := fmt.Sprintf("%s:%s:%s", iacRes.Provider, iacRes.ResourceType, addressName)
+				if res, exists := actualResourceMap[key2]; exists {
+					matchedResource = res
+					matchKey = key2
+				}
+			}
+		}
 
-		drifts = append(drifts, drift)
+		if matchedResource == nil {
+			// Missing resource: defined in IaC but not deployed
+			drift := &iac.IaCDriftResult{
+				UserID:          definition.UserID,
+				IaCDefinitionID: definition.ID,
+				IaCResourceID:   &iacRes.ID,
+				DriftCategory:   iac.DriftCategoryMissing,
+				Status:          iac.DriftStatusDetected,
+				Details: map[string]interface{}{
+					"message": fmt.Sprintf("Resource %s defined in IaC but not found in deployed resources", iacRes.ResourceAddress),
+					"iac_resource": map[string]interface{}{
+						"type":          iacRes.ResourceType,
+						"name":          iacRes.ResourceName,
+						"address":       iacRes.ResourceAddress,
+						"provider":      iacRes.Provider,
+						"configuration": iacRes.Configuration,
+					},
+					"recommendation": "Deploy this resource or remove it from IaC definition",
+				},
+			}
+
+			severity := iac.SeverityMedium
+			drift.Severity = &severity
+			drifts = append(drifts, drift)
+		} else {
+			// Mark this actual resource as matched
+			matchedActualResources[matchKey] = true
+
+			// Check for configuration drift (modified)
+			configDrift := s.detectConfigurationDrift(iacRes, matchedResource)
+			if configDrift != nil {
+				drift := &iac.IaCDriftResult{
+					UserID:           definition.UserID,
+					IaCDefinitionID:  definition.ID,
+					IaCResourceID:    &iacRes.ID,
+					ActualResourceID: &matchedResource.ID,
+					DriftCategory:    iac.DriftCategoryModified,
+					Status:           iac.DriftStatusDetected,
+					Details:          configDrift,
+				}
+
+				severity := iac.SeverityMedium
+				drift.Severity = &severity
+				drifts = append(drifts, drift)
+			}
+		}
 	}
 
 	// Check for shadow resources (deployed but not in IaC)
-	// This would require iterating through actual resources and checking if they're in IaC
+	for key, actualRes := range actualResourceMap {
+		if !matchedActualResources[key] {
+			drift := &iac.IaCDriftResult{
+				UserID:           definition.UserID,
+				IaCDefinitionID:  definition.ID,
+				ActualResourceID: &actualRes.ID,
+				DriftCategory:    iac.DriftCategoryShadow,
+				Status:           iac.DriftStatusDetected,
+				Details: map[string]interface{}{
+					"message": fmt.Sprintf("Resource %s is deployed but not defined in IaC", actualRes.Name),
+					"actual_resource": map[string]interface{}{
+						"type":        actualRes.Type,
+						"name":        actualRes.Name,
+						"provider":    actualRes.Provider,
+						"resource_id": actualRes.ResourceID,
+						"region":      actualRes.Region,
+						"status":      actualRes.Status,
+					},
+					"recommendation": "Add this resource to IaC definition or investigate if it should be removed",
+				},
+			}
 
-	_ = actualResourceMap // Avoid unused variable error
+			severity := iac.SeverityLow
+			drift.Severity = &severity
+			drifts = append(drifts, drift)
+		}
+	}
 
 	return drifts
+}
+
+// splitResourceAddress splits a resource address by dots and returns parts
+// Example: "module.vpc.aws_instance.web" -> ["module", "vpc", "aws_instance", "web"]
+func splitResourceAddress(address string) []string {
+	if address == "" {
+		return []string{}
+	}
+	parts := make([]string, 0)
+	current := ""
+	for _, char := range address {
+		if char == '.' {
+			if current != "" {
+				parts = append(parts, current)
+				current = ""
+			}
+		} else {
+			current += string(char)
+		}
+	}
+	if current != "" {
+		parts = append(parts, current)
+	}
+	return parts
+}
+
+// detectConfigurationDrift compares IaC resource configuration with actual resource configuration
+// Returns nil if no drift detected, otherwise returns details map
+func (s *IaCService) detectConfigurationDrift(iacRes *iac.IaCResource, actualRes *resource.Resource) map[string]interface{} {
+	changes := make([]map[string]interface{}, 0)
+
+	// Parse actual resource configuration from JSON string
+	var actualConfig map[string]interface{}
+	if actualRes.Configuration != "" {
+		if err := json.Unmarshal([]byte(actualRes.Configuration), &actualConfig); err != nil {
+			// If parsing fails, we can't compare configurations
+			return nil
+		}
+	}
+
+	// Compare configurations field by field
+	// Check fields in IaC that differ from actual
+	for key, iacValue := range iacRes.Configuration {
+		actualValue, exists := actualConfig[key]
+		if !exists {
+			changes = append(changes, map[string]interface{}{
+				"field":       key,
+				"iac_value":   iacValue,
+				"actual_value": nil,
+				"change_type": "missing_in_actual",
+			})
+		} else if !deepEqual(iacValue, actualValue) {
+			changes = append(changes, map[string]interface{}{
+				"field":       key,
+				"iac_value":   iacValue,
+				"actual_value": actualValue,
+				"change_type": "modified",
+			})
+		}
+	}
+
+	// Check fields in actual that are not in IaC
+	for key, actualValue := range actualConfig {
+		if _, exists := iacRes.Configuration[key]; !exists {
+			changes = append(changes, map[string]interface{}{
+				"field":       key,
+				"iac_value":   nil,
+				"actual_value": actualValue,
+				"change_type": "added_in_actual",
+			})
+		}
+	}
+
+	// If no changes detected, return nil
+	if len(changes) == 0 {
+		return nil
+	}
+
+	// Build drift details
+	return map[string]interface{}{
+		"message": fmt.Sprintf("Configuration drift detected for resource %s", iacRes.ResourceAddress),
+		"iac_resource": map[string]interface{}{
+			"type":          iacRes.ResourceType,
+			"name":          iacRes.ResourceName,
+			"address":       iacRes.ResourceAddress,
+			"configuration": iacRes.Configuration,
+		},
+		"actual_resource": map[string]interface{}{
+			"type":          actualRes.Type,
+			"name":          actualRes.Name,
+			"resource_id":   actualRes.ResourceID,
+			"configuration": actualConfig,
+		},
+		"changes":        changes,
+		"change_count":   len(changes),
+		"recommendation": "Update IaC definition to match actual state or apply IaC to fix drift",
+	}
+}
+
+// deepEqual performs a deep equality check between two values
+// This is a simplified version - production would use reflect.DeepEqual or similar
+func deepEqual(a, b interface{}) bool {
+	// Convert both to JSON strings for comparison
+	// This handles nested structures but may not be perfect for all cases
+	aJSON, aErr := json.Marshal(a)
+	bJSON, bErr := json.Marshal(b)
+
+	if aErr != nil || bErr != nil {
+		return false
+	}
+
+	return string(aJSON) == string(bJSON)
 }
 
 // validateIaCType validates the IaC type

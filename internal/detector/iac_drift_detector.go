@@ -26,6 +26,14 @@ func (d *IaCDriftDetector) DetectDrifts(iacResources []*iac.IaCResource, actualR
 	iacMap := d.createIaCResourceMap(iacResources)
 	actualMap := d.createActualResourceMap(actualResources)
 
+	// Extract userID and iacDefinitionID from first IaC resource for shadow drifts
+	// All resources in a detection batch should belong to the same user and definition
+	var userID, iacDefinitionID string
+	if len(iacResources) > 0 {
+		userID = iacResources[0].UserID
+		iacDefinitionID = iacResources[0].IaCDefinitionID
+	}
+
 	// Check for missing resources (in IaC but not deployed)
 	for address, iacRes := range iacMap {
 		if _, exists := actualMap[address]; !exists {
@@ -37,7 +45,7 @@ func (d *IaCDriftDetector) DetectDrifts(iacResources []*iac.IaCResource, actualR
 	// Check for shadow resources (deployed but not in IaC)
 	for address, actualRes := range actualMap {
 		if _, exists := iacMap[address]; !exists {
-			drift := d.createShadowResourceDrift(actualRes)
+			drift := d.createShadowResourceDrift(actualRes, userID, iacDefinitionID)
 			drifts = append(drifts, drift)
 		}
 	}
@@ -105,10 +113,12 @@ func (d *IaCDriftDetector) createMissingResourceDrift(iacRes *iac.IaCResource) *
 }
 
 // createShadowResourceDrift creates a drift result for a shadow resource
-func (d *IaCDriftDetector) createShadowResourceDrift(actualRes *ActualResource) *iac.IaCDriftResult {
+func (d *IaCDriftDetector) createShadowResourceDrift(actualRes *ActualResource, userID, iacDefinitionID string) *iac.IaCDriftResult {
 	severity := iac.SeverityMedium
 
 	drift := &iac.IaCDriftResult{
+		UserID:           userID,
+		IaCDefinitionID:  iacDefinitionID,
 		ActualResourceID: &actualRes.ID,
 		DriftCategory:    iac.DriftCategoryShadow,
 		Severity:         &severity,
