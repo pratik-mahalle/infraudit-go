@@ -435,6 +435,28 @@ func (p *Parser) parseTerraformBlock(block *hclsyntax.Block) (*TerraformBlock, e
 		}
 	}
 
+	// Parse backend block explicitly by walking block.Body.Blocks
+	for _, nestedBlock := range block.Body.Blocks {
+		if nestedBlock.Type == "backend" {
+			// Backend type is stored in the label (e.g., backend "s3" { ... })
+			if len(nestedBlock.Labels) > 0 {
+				backendType := nestedBlock.Labels[0]
+				backendConfig, err := p.parseBlockContent(nestedBlock.Body)
+				if err != nil {
+					// If parsing fails, create an empty config but preserve the type
+					backendConfig = make(map[string]interface{})
+				}
+
+				tfBlock.Backend = &Backend{
+					Type:          backendType,
+					Configuration: backendConfig,
+				}
+			}
+			// Only process the first backend block
+			break
+		}
+	}
+
 	return tfBlock, nil
 }
 
@@ -458,6 +480,13 @@ func (p *Parser) parseBlockContent(body *hclsyntax.Body) (map[string]interface{}
 		blockContent, err := p.parseBlockContent(block.Body)
 		if err != nil {
 			continue
+		}
+
+		// Inject block labels if present
+		if len(block.Labels) > 0 {
+			// blockContent is already a map[string]interface{}, inject labels directly
+			blockContent["_labels"] = block.Labels
+			blockContent["_label"] = block.Labels[0] // First label for convenience
 		}
 
 		if existing, ok := result[block.Type]; ok {

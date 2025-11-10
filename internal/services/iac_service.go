@@ -507,19 +507,17 @@ func (s *IaCService) compareResources(iacResources []*iac.IaCResource, actualRes
 	}
 
 	// Track which actual resources have been matched to detect shadow resources later
-	matchedActualResources := make(map[string]bool)
+	matchedActualResourceIDs := make(map[string]bool)
 
 	// Check for missing and modified resources (in IaC)
 	for _, iacRes := range iacResources {
 		// Try multiple matching strategies
 		var matchedResource *resource.Resource
-		var matchKey string
 
 		// Strategy 1: Match by provider:type:name
 		key1 := fmt.Sprintf("%s:%s:%s", iacRes.Provider, iacRes.ResourceType, iacRes.ResourceName)
 		if res, exists := actualResourceMap[key1]; exists {
 			matchedResource = res
-			matchKey = key1
 		}
 
 		// Strategy 2: Try matching with resource address (last part after dot)
@@ -531,7 +529,6 @@ func (s *IaCService) compareResources(iacResources []*iac.IaCResource, actualRes
 				key2 := fmt.Sprintf("%s:%s:%s", iacRes.Provider, iacRes.ResourceType, addressName)
 				if res, exists := actualResourceMap[key2]; exists {
 					matchedResource = res
-					matchKey = key2
 				}
 			}
 		}
@@ -562,7 +559,7 @@ func (s *IaCService) compareResources(iacResources []*iac.IaCResource, actualRes
 			drifts = append(drifts, drift)
 		} else {
 			// Mark this actual resource as matched
-			matchedActualResources[matchKey] = true
+			matchedActualResourceIDs[matchedResource.ID] = true
 
 			// Check for configuration drift (modified)
 			configDrift := s.detectConfigurationDrift(iacRes, matchedResource)
@@ -585,32 +582,37 @@ func (s *IaCService) compareResources(iacResources []*iac.IaCResource, actualRes
 	}
 
 	// Check for shadow resources (deployed but not in IaC)
-	for key, actualRes := range actualResourceMap {
-		if !matchedActualResources[key] {
-			drift := &iac.IaCDriftResult{
-				UserID:           definition.UserID,
-				IaCDefinitionID:  definition.ID,
-				ActualResourceID: &actualRes.ID,
-				DriftCategory:    iac.DriftCategoryShadow,
-				Status:           iac.DriftStatusDetected,
-				Details: map[string]interface{}{
-					"message": fmt.Sprintf("Resource %s is deployed but not defined in IaC", actualRes.Name),
-					"actual_resource": map[string]interface{}{
-						"type":        actualRes.Type,
-						"name":        actualRes.Name,
-						"provider":    actualRes.Provider,
-						"resource_id": actualRes.ResourceID,
-						"region":      actualRes.Region,
-						"status":      actualRes.Status,
-					},
-					"recommendation": "Add this resource to IaC definition or investigate if it should be removed",
-				},
-			}
-
-			severity := iac.SeverityLow
-			drift.Severity = &severity
-			drifts = append(drifts, drift)
+	seenResourceIDs := make(map[string]bool)
+	for _, actualRes := range actualResourceMap {
+		// Skip if we've already processed this resource or if it was matched
+		if seenResourceIDs[actualRes.ID] || matchedActualResourceIDs[actualRes.ID] {
+			continue
 		}
+		seenResourceIDs[actualRes.ID] = true
+
+		drift := &iac.IaCDriftResult{
+			UserID:           definition.UserID,
+			IaCDefinitionID:  definition.ID,
+			ActualResourceID: &actualRes.ID,
+			DriftCategory:    iac.DriftCategoryShadow,
+			Status:           iac.DriftStatusDetected,
+			Details: map[string]interface{}{
+				"message": fmt.Sprintf("Resource %s is deployed but not defined in IaC", actualRes.Name),
+				"actual_resource": map[string]interface{}{
+					"type":        actualRes.Type,
+					"name":        actualRes.Name,
+					"provider":    actualRes.Provider,
+					"resource_id": actualRes.ResourceID,
+					"region":      actualRes.Region,
+					"status":      actualRes.Status,
+				},
+				"recommendation": "Add this resource to IaC definition or investigate if it should be removed",
+			},
+		}
+
+		severity := iac.SeverityLow
+		drift.Severity = &severity
+		drifts = append(drifts, drift)
 	}
 
 	return drifts
