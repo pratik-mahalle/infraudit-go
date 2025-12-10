@@ -17,7 +17,9 @@ This is a Go-based cloud infrastructure auditing and security platform that help
 - Clean: `make clean`
 
 ### Additional Targets (Makefile.new - Extended Build System)
-The repository includes an extended Makefile (`Makefile.new`) with additional targets:
+The repository includes an extended Makefile (`Makefile.new`) with more comprehensive targets. 
+This is a newer, more complete build configuration that may eventually replace the main Makefile.
+You can use it by specifying `-f Makefile.new`:
 - Test: `make -f Makefile.new test` (run all tests with race detector)
 - Test with coverage: `make -f Makefile.new test-coverage`
 - Pre-commit check: `make -f Makefile.new pre-commit` (runs fmt, lint, and test)
