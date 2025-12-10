@@ -127,18 +127,18 @@ If the test target is not available in your Makefile:
 2. Make changes following the guidelines above
 3. Run `make fmt` to format your code
 4. Run `make lint` to check for issues
-5. Run `make test` to ensure tests pass
-6. If you modified API handlers, run `make swagger` to update documentation
+5. Run tests manually with `go test -v -race ./...` (or use `make -f Makefile.new test`)
+6. If you modified API handlers with Swagger annotations, run `make swagger` to update documentation
 7. Commit your changes with a descriptive message
 8. Push and create a pull request
 
 ## Common Tasks
 
 ### Adding a New API Endpoint
-1. Add handler function following the existing pattern in `cmd/api/`
-2. Add Swagger annotations to the handler (see existing examples in `cmd/api/main.go`)
+1. Add handler function following the existing patterns in the codebase
+2. Add Swagger annotations to the handler (see Swagger tag definitions in `cmd/api/main.go`)
 3. Register the route in the router setup
-4. Run `make swagger` to update documentation
+4. Run `make swagger` to regenerate API documentation
 5. Add tests for the new endpoint
 
 ### Adding Support for a New Cloud Provider
