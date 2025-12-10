@@ -34,16 +34,15 @@ If the test target is not available in your Makefile:
   - `cmd/api/`: Main API server application
   - `cmd/migrate/`: Database migration tool
 - `internal/`: Private application code
-  - `internal/api/`: API handlers and routing
   - `internal/auth/`: Authentication and authorization
   - `internal/config/`: Configuration management
   - `internal/db/`: Database connection and utilities
   - `internal/detector/`: Drift detection logic
-  - `internal/domain/`: Domain models and business logic
+  - `internal/domain/`: Domain models and business logic (alerts, anomalies, resources, etc.)
   - `internal/integrations/`: Third-party service integrations
-  - `internal/pkg/`: Internal shared packages (logger, validator, etc.)
+  - `internal/pkg/`: Internal shared packages (logger, validator, errors, utils)
   - `internal/providers/`: Cloud provider implementations (AWS, Azure, GCP)
-  - `internal/repository/`: Data access layer
+  - `internal/repository/`: Data access layer (PostgreSQL)
   - `internal/scanners/`: Security and compliance scanners
   - `internal/services/`: Business logic services
 - `pkg/`: Public packages that can be imported by external projects
@@ -136,9 +135,9 @@ If the test target is not available in your Makefile:
 ## Common Tasks
 
 ### Adding a New API Endpoint
-1. Add handler function in `internal/api/handlers/`
-2. Add Swagger annotations to the handler
-3. Register route in `internal/api/router/`
+1. Add handler function following the existing pattern in `cmd/api/`
+2. Add Swagger annotations to the handler (see existing examples in `cmd/api/main.go`)
+3. Register the route in the router setup
 4. Run `make swagger` to update documentation
 5. Add tests for the new endpoint
 
