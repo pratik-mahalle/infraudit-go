@@ -80,8 +80,9 @@ func (e *RecommendationEngine) processBatchesConcurrently(
 			}
 			
 			if err := processFn(ctx, userID, b); err != nil {
+				// Log error but continue with other batches for resiliency
+				// This ensures one failed batch doesn't stop the entire recommendation generation
 				e.logger.ErrorWithErr(err, "Failed to process batch")
-				// Don't return error, continue with other batches
 			}
 		}(batch)
 	}

@@ -139,14 +139,26 @@ func (d *DriftDetector) valuesEqual(v1, v2 interface{}) bool {
 		v2Str, ok := v2.(string)
 		return ok && v1Type == v2Str
 	case float64:
-		v2Float, ok := v2.(float64)
-		return ok && v1Type == v2Float
+		// Handle both float64 and int (JSON unmarshals numbers as float64)
+		switch v2Type := v2.(type) {
+		case float64:
+			return v1Type == v2Type
+		case int:
+			return v1Type == float64(v2Type)
+		}
+		return false
 	case bool:
 		v2Bool, ok := v2.(bool)
 		return ok && v1Type == v2Bool
 	case int:
-		v2Int, ok := v2.(int)
-		return ok && v1Type == v2Int
+		// Handle both int and float64 (JSON unmarshals numbers as float64)
+		switch v2Type := v2.(type) {
+		case int:
+			return v1Type == v2Type
+		case float64:
+			return float64(v1Type) == v2Type
+		}
+		return false
 	}
 
 	// For slices, compare elements
