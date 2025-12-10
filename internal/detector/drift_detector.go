@@ -125,9 +125,65 @@ func (d *DriftDetector) compareConfigs(baseline, current map[string]interface{},
 
 // valuesEqual compares two values for equality
 func (d *DriftDetector) valuesEqual(v1, v2 interface{}) bool {
-	// Convert to JSON and compare (handles nested structures)
-	j1, _ := json.Marshal(v1)
-	j2, _ := json.Marshal(v2)
+	// Fast path for nil comparison
+	if v1 == nil && v2 == nil {
+		return true
+	}
+	if v1 == nil || v2 == nil {
+		return false
+	}
+
+	// Fast path for primitive types
+	switch v1Type := v1.(type) {
+	case string:
+		v2Str, ok := v2.(string)
+		return ok && v1Type == v2Str
+	case float64:
+		v2Float, ok := v2.(float64)
+		return ok && v1Type == v2Float
+	case bool:
+		v2Bool, ok := v2.(bool)
+		return ok && v1Type == v2Bool
+	case int:
+		v2Int, ok := v2.(int)
+		return ok && v1Type == v2Int
+	}
+
+	// For slices, compare elements
+	if v1Slice, ok := v1.([]interface{}); ok {
+		v2Slice, ok := v2.([]interface{})
+		if !ok || len(v1Slice) != len(v2Slice) {
+			return false
+		}
+		for i := range v1Slice {
+			if !d.valuesEqual(v1Slice[i], v2Slice[i]) {
+				return false
+			}
+		}
+		return true
+	}
+
+	// For maps, compare recursively
+	if v1Map, ok := v1.(map[string]interface{}); ok {
+		v2Map, ok := v2.(map[string]interface{})
+		if !ok || len(v1Map) != len(v2Map) {
+			return false
+		}
+		for key, val1 := range v1Map {
+			val2, exists := v2Map[key]
+			if !exists || !d.valuesEqual(val1, val2) {
+				return false
+			}
+		}
+		return true
+	}
+
+	// Fallback to JSON comparison for complex types
+	j1, err1 := json.Marshal(v1)
+	j2, err2 := json.Marshal(v2)
+	if err1 != nil || err2 != nil {
+		return false
+	}
 	return string(j1) == string(j2)
 }
 
