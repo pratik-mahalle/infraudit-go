@@ -164,7 +164,8 @@ func (r *ResourceRepository) List(ctx context.Context, userID int64, filter reso
 	}
 	defer rows.Close()
 
-	var resources []*resource.Resource
+	// Pre-allocate slice with expected capacity to avoid repeated allocations
+	resources := make([]*resource.Resource, 0, limit)
 	for rows.Next() {
 		var res resource.Resource
 		err := rows.Scan(&res.UserID, &res.Provider, &res.ResourceID, &res.Name, &res.Type, &res.Region, &res.Status)

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/pratik-mahalle/infraudit/internal/domain/drift"
 	"github.com/pratik-mahalle/infraudit/internal/domain/recommendation"
@@ -12,6 +13,7 @@ import (
 	"github.com/pratik-mahalle/infraudit/internal/domain/vulnerability"
 	"github.com/pratik-mahalle/infraudit/internal/integrations"
 	"github.com/pratik-mahalle/infraudit/internal/pkg/logger"
+	"golang.org/x/time/rate"
 )
 
 // RecommendationEngine generates intelligent recommendations using AI
@@ -22,6 +24,7 @@ type RecommendationEngine struct {
 	driftRepo    drift.Repository
 	recRepo      recommendation.Repository
 	logger       *logger.Logger
+	rateLimiter  *rate.Limiter
 }
 
 // NewRecommendationEngine creates a new recommendation engine
@@ -33,6 +36,10 @@ func NewRecommendationEngine(
 	recRepo recommendation.Repository,
 	logger *logger.Logger,
 ) *RecommendationEngine {
+	// Rate limit: 10 requests per second with burst of 20
+	// This prevents overwhelming the AI API
+	limiter := rate.NewLimiter(10, 20)
+	
 	return &RecommendationEngine{
 		geminiClient: geminiClient,
 		resourceRepo: resourceRepo,
@@ -40,7 +47,59 @@ func NewRecommendationEngine(
 		driftRepo:    driftRepo,
 		recRepo:      recRepo,
 		logger:       logger,
+		rateLimiter:  limiter,
 	}
+}
+
+// processBatchesConcurrently processes batches concurrently with rate limiting
+func (e *RecommendationEngine) processBatchesConcurrently(
+	ctx context.Context,
+	userID int64,
+	batches [][]interface{},
+	processFn func(context.Context, int64, []interface{}) error,
+) error {
+	const maxConcurrency = 3 // Process 3 batches concurrently
+	
+	var wg sync.WaitGroup
+	errChan := make(chan error, len(batches))
+	semaphore := make(chan struct{}, maxConcurrency)
+
+	for _, batch := range batches {
+		wg.Add(1)
+		go func(b []interface{}) {
+			defer wg.Done()
+			
+			// Acquire semaphore
+			semaphore <- struct{}{}
+			defer func() { <-semaphore }()
+			
+			// Rate limit API calls
+			if err := e.rateLimiter.Wait(ctx); err != nil {
+				errChan <- err
+				return
+			}
+			
+			if err := processFn(ctx, userID, b); err != nil {
+				// Send error to channel for collection
+				errChan <- err
+				// Also log for monitoring
+				e.logger.ErrorWithErr(err, "Failed to process batch")
+			}
+		}(batch)
+	}
+
+	wg.Wait()
+	close(errChan)
+
+	// Collect errors (if any)
+	var firstErr error
+	for err := range errChan {
+		if firstErr == nil {
+			firstErr = err
+		}
+	}
+
+	return firstErr
 }
 
 // GenerateRecommendations generates all types of recommendations for a user
@@ -78,11 +137,11 @@ func (e *RecommendationEngine) GenerateRecommendations(ctx context.Context, user
 func (e *RecommendationEngine) generateCostOptimizationRecommendations(ctx context.Context, userID int64) error {
 	e.logger.Info("Generating cost optimization recommendations")
 
-	// Process all resources with pagination
-	pageSize := 1000
+	// Process resources in streaming fashion without loading all into memory
+	const pageSize = 100
+	const batchSize = 10
 	offset := 0
-	batchSize := 10
-	allResources := make([]*resource.Resource, 0)
+	totalProcessed := 0
 
 	for {
 		// Get page of resources
@@ -95,7 +154,21 @@ func (e *RecommendationEngine) generateCostOptimizationRecommendations(ctx conte
 			break
 		}
 
-		allResources = append(allResources, resources...)
+		totalProcessed += len(resources)
+
+		// Analyze resources in batches within this page
+		for i := 0; i < len(resources); i += batchSize {
+			end := i + batchSize
+			if end > len(resources) {
+				end = len(resources)
+			}
+
+			batch := resources[i:end]
+			if err := e.analyzeCostOptimizationBatch(ctx, userID, batch); err != nil {
+				e.logger.ErrorWithErr(err, "Failed to analyze cost optimization batch")
+				continue
+			}
+		}
 
 		// Check if we've fetched all resources
 		if int64(offset+len(resources)) >= total {
@@ -105,28 +178,14 @@ func (e *RecommendationEngine) generateCostOptimizationRecommendations(ctx conte
 		offset += len(resources)
 	}
 
-	if len(allResources) == 0 {
+	if totalProcessed == 0 {
 		e.logger.Info("No resources found, skipping cost optimization recommendations")
 		return nil
 	}
 
 	e.logger.WithFields(map[string]interface{}{
-		"total_resources": len(allResources),
+		"total_resources": totalProcessed,
 	}).Info("Processing resources for cost optimization")
-
-	// Analyze resources in batches
-	for i := 0; i < len(allResources); i += batchSize {
-		end := i + batchSize
-		if end > len(allResources) {
-			end = len(allResources)
-		}
-
-		batch := allResources[i:end]
-		if err := e.analyzeCostOptimizationBatch(ctx, userID, batch); err != nil {
-			e.logger.ErrorWithErr(err, "Failed to analyze cost optimization batch")
-			continue
-		}
-	}
 
 	return nil
 }
@@ -149,9 +208,10 @@ func (e *RecommendationEngine) analyzeCostOptimizationBatch(ctx context.Context,
 	}
 
 	// Batch analyze with Gemini
-	jsonData, err := json.MarshalIndent(map[string]interface{}{
+	// Use Marshal instead of MarshalIndent for better performance
+	jsonData, err := json.Marshal(map[string]interface{}{
 		"resources": resourceData,
-	}, "", "  ")
+	})
 	if err != nil {
 		return fmt.Errorf("failed to marshal resources: %w", err)
 	}
@@ -278,7 +338,7 @@ func (e *RecommendationEngine) generateResourceSecurityRecommendations(ctx conte
 	e.logger.Info("Generating resource security recommendations")
 
 	const (
-		pageSize  = 1000
+		pageSize  = 100
 		batchSize = 10
 	)
 	offset := 0
@@ -315,9 +375,10 @@ func (e *RecommendationEngine) generateResourceSecurityRecommendations(ctx conte
 				})
 			}
 
-			jsonData, err := json.MarshalIndent(map[string]interface{}{
+			// Use Marshal instead of MarshalIndent for better performance
+			jsonData, err := json.Marshal(map[string]interface{}{
 				"resources": resourceData,
-			}, "", "  ")
+			})
 			if err != nil {
 				e.logger.ErrorWithErr(err, "Failed to marshal resources for security analysis")
 				continue

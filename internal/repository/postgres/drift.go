@@ -112,7 +112,8 @@ func (r *DriftRepository) List(ctx context.Context, userID int64, filter drift.F
 	}
 	defer rows.Close()
 
-	var drifts []*drift.Drift
+	// Pre-allocate slice with reasonable capacity
+	drifts := make([]*drift.Drift, 0, 100)
 	for rows.Next() {
 		var d drift.Drift
 		var detectedAt string
@@ -157,7 +158,8 @@ func (r *DriftRepository) ListWithPagination(ctx context.Context, userID int64, 
 	}
 	defer rows.Close()
 
-	var drifts []*drift.Drift
+	// Pre-allocate slice with expected capacity
+	drifts := make([]*drift.Drift, 0, limit)
 	for rows.Next() {
 		var d drift.Drift
 		var detectedAt string

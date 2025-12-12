@@ -151,18 +151,30 @@ func (s *DriftService) DetectDrifts(ctx context.Context, userID int64) error {
 		"user_id": userID,
 	}).Info("Starting drift detection")
 
-	// Get all resources for the user
-	resources, _, err := s.resourceRepo.List(ctx, userID, resource.Filter{}, 1000, 0)
-	if err != nil {
-		s.logger.ErrorWithErr(err, "Failed to fetch resources for drift detection")
-		return err
-	}
-
 	driftsDetected := 0
 	driftsCreated := 0
+	totalResources := 0
 
-	// Check each resource against its baseline
-	for _, res := range resources {
+	// Process resources in batches to avoid loading everything into memory
+	const pageSize = 100
+	offset := 0
+
+	for {
+		// Get batch of resources
+		resources, total, err := s.resourceRepo.List(ctx, userID, resource.Filter{}, pageSize, offset)
+		if err != nil {
+			s.logger.ErrorWithErr(err, "Failed to fetch resources for drift detection")
+			return err
+		}
+
+		if len(resources) == 0 {
+			break
+		}
+
+		totalResources += len(resources)
+
+		// Check each resource against its baseline
+		for _, res := range resources {
 		// Skip resources without configuration data
 		if res.Configuration == "" {
 			s.logger.WithFields(map[string]interface{}{
@@ -236,9 +248,17 @@ func (s *DriftService) DetectDrifts(ctx context.Context, userID int64) error {
 		}
 	}
 
+		// Check if we've processed all resources
+		if int64(offset+len(resources)) >= total {
+			break
+		}
+
+		offset += len(resources)
+	}
+
 	s.logger.WithFields(map[string]interface{}{
 		"user_id":         userID,
-		"resources":       len(resources),
+		"resources":       totalResources,
 		"drifts_detected": driftsDetected,
 		"drifts_created":  driftsCreated,
 	}).Info("Drift detection completed")

@@ -131,7 +131,8 @@ func (r *RecommendationRepository) List(ctx context.Context, userID int64, filte
 	}
 	defer rows.Close()
 
-	var recs []*recommendation.Recommendation
+	// Pre-allocate slice with reasonable capacity
+	recs := make([]*recommendation.Recommendation, 0, 100)
 	for rows.Next() {
 		var rec recommendation.Recommendation
 		var resourcesJSON string
@@ -179,7 +180,8 @@ func (r *RecommendationRepository) ListWithPagination(ctx context.Context, userI
 	}
 	defer rows.Close()
 
-	var recs []*recommendation.Recommendation
+	// Pre-allocate slice with expected capacity
+	recs := make([]*recommendation.Recommendation, 0, limit)
 	for rows.Next() {
 		var rec recommendation.Recommendation
 		var resourcesJSON string

@@ -112,7 +112,8 @@ func (r *AnomalyRepository) List(ctx context.Context, userID int64, filter anoma
 	}
 	defer rows.Close()
 
-	var anomalies []*anomaly.Anomaly
+	// Pre-allocate slice with reasonable capacity
+	anomalies := make([]*anomaly.Anomaly, 0, 100)
 	for rows.Next() {
 		var a anomaly.Anomaly
 		var detectedAt string
@@ -157,7 +158,8 @@ func (r *AnomalyRepository) ListWithPagination(ctx context.Context, userID int64
 	}
 	defer rows.Close()
 
-	var anomalies []*anomaly.Anomaly
+	// Pre-allocate slice with expected capacity
+	anomalies := make([]*anomaly.Anomaly, 0, limit)
 	for rows.Next() {
 		var a anomaly.Anomaly
 		var detectedAt string
