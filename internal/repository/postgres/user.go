@@ -26,12 +26,17 @@ func (r *UserRepository) Create(ctx context.Context, u *user.User) error {
 	u.UpdatedAt = now
 
 	query := `
-		INSERT INTO users (email, username, full_name, role, plan_type, created_at, updated_at)
+		INSERT INTO users (email, password_hash, full_name, role, plan_type, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?)
 	`
 
+	var fullName interface{}
+	if u.FullName != nil {
+		fullName = *u.FullName
+	}
+
 	result, err := r.db.ExecContext(ctx, query,
-		u.Email, u.Username, u.FullName, u.Role, u.PlanType, now.Unix(), now.Unix(),
+		u.Email, u.PasswordHash, fullName, u.Role, u.PlanType, now.Unix(), now.Unix(),
 	)
 	if err != nil {
 		return errors.DatabaseError("Failed to create user", err)
@@ -49,7 +54,7 @@ func (r *UserRepository) Create(ctx context.Context, u *user.User) error {
 // GetByID retrieves a user by ID
 func (r *UserRepository) GetByID(ctx context.Context, id int64) (*user.User, error) {
 	query := `
-		SELECT id, email, username, full_name, role, plan_type, created_at, updated_at
+		SELECT id, email, password_hash, full_name, role, plan_type, created_at, updated_at
 		FROM users WHERE id = ?
 	`
 
@@ -58,7 +63,7 @@ func (r *UserRepository) GetByID(ctx context.Context, id int64) (*user.User, err
 	var createdAt, updatedAt int64
 
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
-		&u.ID, &u.Email, &u.Username, &fullName, &u.Role, &u.PlanType, &createdAt, &updatedAt,
+		&u.ID, &u.Email, &u.PasswordHash, &fullName, &u.Role, &u.PlanType, &createdAt, &updatedAt,
 	)
 
 	if err == sql.ErrNoRows {
@@ -80,7 +85,7 @@ func (r *UserRepository) GetByID(ctx context.Context, id int64) (*user.User, err
 // GetByEmail retrieves a user by email
 func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*user.User, error) {
 	query := `
-		SELECT id, email, username, full_name, role, plan_type, created_at, updated_at
+		SELECT id, email, password_hash, full_name, role, plan_type, created_at, updated_at
 		FROM users WHERE email = ?
 	`
 
@@ -89,7 +94,7 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*user.Us
 	var createdAt, updatedAt int64
 
 	err := r.db.QueryRowContext(ctx, query, email).Scan(
-		&u.ID, &u.Email, &u.Username, &fullName, &u.Role, &u.PlanType, &createdAt, &updatedAt,
+		&u.ID, &u.Email, &u.PasswordHash, &fullName, &u.Role, &u.PlanType, &createdAt, &updatedAt,
 	)
 
 	if err == sql.ErrNoRows {
@@ -114,12 +119,17 @@ func (r *UserRepository) Update(ctx context.Context, u *user.User) error {
 
 	query := `
 		UPDATE users
-		SET email = ?, username = ?, full_name = ?, role = ?, plan_type = ?, updated_at = ?
+		SET email = ?, full_name = ?, role = ?, plan_type = ?, updated_at = ?
 		WHERE id = ?
 	`
 
+	var fullName interface{}
+	if u.FullName != nil {
+		fullName = *u.FullName
+	}
+
 	result, err := r.db.ExecContext(ctx, query,
-		u.Email, u.Username, u.FullName, u.Role, u.PlanType, u.UpdatedAt.Unix(), u.ID,
+		u.Email, fullName, u.Role, u.PlanType, u.UpdatedAt.Unix(), u.ID,
 	)
 	if err != nil {
 		return errors.DatabaseError("Failed to update user", err)
@@ -169,7 +179,7 @@ func (r *UserRepository) List(ctx context.Context, limit, offset int) ([]*user.U
 
 	// Get users
 	query := `
-		SELECT id, email, username, full_name, role, plan_type, created_at, updated_at
+		SELECT id, email, full_name, role, plan_type, created_at, updated_at
 		FROM users
 		ORDER BY id DESC
 		LIMIT ? OFFSET ?
@@ -187,7 +197,7 @@ func (r *UserRepository) List(ctx context.Context, limit, offset int) ([]*user.U
 		var fullName sql.NullString
 		var createdAt, updatedAt int64
 
-		err := rows.Scan(&u.ID, &u.Email, &u.Username, &fullName, &u.Role, &u.PlanType, &createdAt, &updatedAt)
+		err := rows.Scan(&u.ID, &u.Email, &fullName, &u.Role, &u.PlanType, &createdAt, &updatedAt)
 		if err != nil {
 			return nil, 0, errors.DatabaseError("Failed to scan user", err)
 		}

@@ -15,26 +15,29 @@ func TestUserService_Create(t *testing.T) {
 	service := NewUserService(mockRepo, log)
 
 	tests := []struct {
-		name    string
-		email   string
-		wantErr bool
+		name     string
+		email    string
+		password string
+		wantErr  bool
 	}{
 		{
-			name:    "successful user creation",
-			email:   "test@example.com",
-			wantErr: false,
+			name:     "successful user creation",
+			email:    "test@example.com",
+			password: "password123",
+			wantErr:  false,
 		},
 		{
-			name:    "create user with valid email",
-			email:   "user@domain.com",
-			wantErr: false,
+			name:     "create user with valid email",
+			email:    "user@domain.com",
+			password: "password123",
+			wantErr:  false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			u, err := service.Create(ctx, tt.email)
+			u, err := service.Create(ctx, tt.email, tt.password)
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Create() error = %v, wantErr %v", err, tt.wantErr)
@@ -67,7 +70,7 @@ func TestUserService_GetByID(t *testing.T) {
 
 	// Create a user first
 	ctx := context.Background()
-	createdUser, _ := service.Create(ctx, "test@example.com")
+	createdUser, _ := service.Create(ctx, "test@example.com", "password123")
 
 	tests := []struct {
 		name    string
@@ -110,7 +113,7 @@ func TestUserService_GetByEmail(t *testing.T) {
 	// Create a user first
 	ctx := context.Background()
 	email := "test@example.com"
-	service.Create(ctx, email)
+	service.Create(ctx, email, "password123")
 
 	tests := []struct {
 		name    string
@@ -157,7 +160,7 @@ func TestUserService_Update(t *testing.T) {
 	service := NewUserService(mockRepo, log)
 
 	ctx := context.Background()
-	u, _ := service.Create(ctx, "test@example.com")
+	u, _ := service.Create(ctx, "test@example.com", "password123")
 
 	// Update user
 	u.PlanType = user.PlanTypePro
@@ -180,7 +183,7 @@ func TestUserService_UpgradePlan(t *testing.T) {
 	service := NewUserService(mockRepo, log)
 
 	ctx := context.Background()
-	u, _ := service.Create(ctx, "test@example.com")
+	u, _ := service.Create(ctx, "test@example.com", "password123")
 
 	tests := []struct {
 		name     string
@@ -233,7 +236,7 @@ func TestUserService_GetTrialStatus(t *testing.T) {
 	service := NewUserService(mockRepo, log)
 
 	ctx := context.Background()
-	u, _ := service.Create(ctx, "test@example.com")
+	u, _ := service.Create(ctx, "test@example.com", "password123")
 
 	// Set user to trial
 	u.PlanType = user.PlanTypeTrial

@@ -10,8 +10,11 @@ type Service interface {
 	// GetByEmail retrieves a user by email
 	GetByEmail(ctx context.Context, email string) (*User, error)
 
-	// Create creates a new user
-	Create(ctx context.Context, email string) (*User, error)
+	// Create creates a new user with password
+	Create(ctx context.Context, email, password string) (*User, error)
+
+	// Authenticate verifies user credentials and returns the user
+	Authenticate(ctx context.Context, email, password string) (*User, error)
 
 	// Update updates a user
 	Update(ctx context.Context, user *User) error

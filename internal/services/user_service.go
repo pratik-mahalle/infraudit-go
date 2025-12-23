@@ -4,7 +4,9 @@ import (
 	"context"
 
 	"github.com/pratik-mahalle/infraudit/internal/domain/user"
+	"github.com/pratik-mahalle/infraudit/internal/pkg/errors"
 	"github.com/pratik-mahalle/infraudit/internal/pkg/logger"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // UserService implements user.Service
@@ -31,15 +33,23 @@ func (s *UserService) GetByEmail(ctx context.Context, email string) (*user.User,
 	return s.repo.GetByEmail(ctx, email)
 }
 
-// Create creates a new user
-func (s *UserService) Create(ctx context.Context, email string) (*user.User, error) {
-	u := &user.User{
-		Email:    email,
-		Role:     user.RoleUser,
-		PlanType: user.PlanTypeFree,
+// Create creates a new user with password
+func (s *UserService) Create(ctx context.Context, email, password string) (*user.User, error) {
+	// Hash password
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), s.getBCryptCost())
+	if err != nil {
+		s.logger.ErrorWithErr(err, "Failed to hash password")
+		return nil, errors.Internal("Failed to hash password", err)
 	}
 
-	err := s.repo.Create(ctx, u)
+	u := &user.User{
+		Email:        email,
+		PasswordHash: string(hashedPassword),
+		Role:         user.RoleUser,
+		PlanType:     user.PlanTypeFree,
+	}
+
+	err = s.repo.Create(ctx, u)
 	if err != nil {
 		s.logger.ErrorWithErr(err, "Failed to create user")
 		return nil, err
@@ -51,6 +61,39 @@ func (s *UserService) Create(ctx context.Context, email string) (*user.User, err
 	}).Info("User created")
 
 	return u, nil
+}
+
+// Authenticate verifies user credentials and returns the user
+func (s *UserService) Authenticate(ctx context.Context, email, password string) (*user.User, error) {
+	u, err := s.repo.GetByEmail(ctx, email)
+	if err != nil {
+		s.logger.WithFields(map[string]interface{}{
+			"email": email,
+		}).Warn("User not found during authentication")
+		return nil, errors.Unauthorized("Invalid credentials")
+	}
+
+	// Compare password
+	err = bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(password))
+	if err != nil {
+		s.logger.WithFields(map[string]interface{}{
+			"user_id": u.ID,
+			"email":   email,
+		}).Warn("Invalid password during authentication")
+		return nil, errors.Unauthorized("Invalid credentials")
+	}
+
+	s.logger.WithFields(map[string]interface{}{
+		"user_id": u.ID,
+		"email":   email,
+	}).Info("User authenticated successfully")
+
+	return u, nil
+}
+
+// getBCryptCost returns the bcrypt cost factor (default: 12)
+func (s *UserService) getBCryptCost() int {
+	return bcrypt.DefaultCost
 }
 
 // Update updates a user
