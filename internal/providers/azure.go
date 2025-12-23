@@ -213,12 +213,12 @@ func buildAzureVMConfiguration(vm *armcompute.VirtualMachine) map[string]interfa
 	if vm.Properties != nil && vm.Properties.StorageProfile != nil && vm.Properties.StorageProfile.OSDisk != nil {
 		osDisk := vm.Properties.StorageProfile.OSDisk
 		config["os_disk"] = map[string]interface{}{
-			"name":         ptrStr(osDisk.Name),
+			"name":          ptrStr(osDisk.Name),
 			"create_option": string(*osDisk.CreateOption),
 		}
 		if osDisk.ManagedDisk != nil && osDisk.ManagedDisk.DiskEncryptionSet != nil {
 			config["encryption"] = map[string]interface{}{
-				"enabled": true,
+				"enabled":             true,
 				"disk_encryption_set": ptrStr(osDisk.ManagedDisk.DiskEncryptionSet.ID),
 			}
 		} else {

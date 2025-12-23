@@ -167,12 +167,12 @@ func buildEC2Configuration(inst types.Instance, tags map[string]string) map[stri
 
 	// Network configuration
 	config["network"] = map[string]interface{}{
-		"vpc_id":              ptrString(inst.VpcId),
-		"subnet_id":           ptrString(inst.SubnetId),
-		"private_ip_address":  ptrString(inst.PrivateIpAddress),
-		"public_ip_address":   ptrString(inst.PublicIpAddress),
-		"private_dns_name":    ptrString(inst.PrivateDnsName),
-		"public_dns_name":     ptrString(inst.PublicDnsName),
+		"vpc_id":             ptrString(inst.VpcId),
+		"subnet_id":          ptrString(inst.SubnetId),
+		"private_ip_address": ptrString(inst.PrivateIpAddress),
+		"public_ip_address":  ptrString(inst.PublicIpAddress),
+		"private_dns_name":   ptrString(inst.PrivateDnsName),
+		"public_dns_name":    ptrString(inst.PublicDnsName),
 	}
 
 	// Encryption
@@ -275,11 +275,11 @@ func buildS3Configuration(ctx context.Context, s3c *s3.Client, bucketName string
 	}); err == nil && pabResp.PublicAccessBlockConfiguration != nil {
 		pab := pabResp.PublicAccessBlockConfiguration
 		config["public_access"] = map[string]interface{}{
-			"block_public_acls":        pab.BlockPublicAcls,
-			"ignore_public_acls":       pab.IgnorePublicAcls,
-			"block_public_policy":      pab.BlockPublicPolicy,
-			"restrict_public_buckets":  pab.RestrictPublicBuckets,
-			"public_access_blocked":    pab.BlockPublicAcls && pab.IgnorePublicAcls && pab.BlockPublicPolicy && pab.RestrictPublicBuckets,
+			"block_public_acls":       pab.BlockPublicAcls,
+			"ignore_public_acls":      pab.IgnorePublicAcls,
+			"block_public_policy":     pab.BlockPublicPolicy,
+			"restrict_public_buckets": pab.RestrictPublicBuckets,
+			"public_access_blocked":   pab.BlockPublicAcls && pab.IgnorePublicAcls && pab.BlockPublicPolicy && pab.RestrictPublicBuckets,
 		}
 	} else {
 		config["public_access"] = map[string]interface{}{

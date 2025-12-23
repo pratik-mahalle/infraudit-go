@@ -111,11 +111,11 @@ func GCPListResources(ctx context.Context, creds GCPCredentials) ([]services.Clo
 // buildGCEConfiguration creates a comprehensive configuration object for GCE instances
 func buildGCEConfiguration(inst *computepb.Instance) map[string]interface{} {
 	config := map[string]interface{}{
-		"instance_id":   strconv.FormatUint(inst.GetId(), 10),
-		"name":          inst.GetName(),
-		"machine_type":  inst.GetMachineType(),
-		"status":        inst.GetStatus(),
-		"zone":          inst.GetZone(),
+		"instance_id":  strconv.FormatUint(inst.GetId(), 10),
+		"name":         inst.GetName(),
+		"machine_type": inst.GetMachineType(),
+		"status":       inst.GetStatus(),
+		"zone":         inst.GetZone(),
 	}
 
 	// Tags
@@ -133,9 +133,9 @@ func buildGCEConfiguration(inst *computepb.Instance) map[string]interface{} {
 		networks := make([]map[string]interface{}, 0, len(inst.NetworkInterfaces))
 		for _, ni := range inst.NetworkInterfaces {
 			network := map[string]interface{}{
-				"network":      ni.GetNetwork(),
-				"subnetwork":   ni.GetSubnetwork(),
-				"network_ip":   ni.GetNetworkIP(),
+				"network":    ni.GetNetwork(),
+				"subnetwork": ni.GetSubnetwork(),
+				"network_ip": ni.GetNetworkIP(),
 			}
 
 			// Access configs (public IPs)
@@ -143,9 +143,9 @@ func buildGCEConfiguration(inst *computepb.Instance) map[string]interface{} {
 				accessConfigs := make([]map[string]string, 0)
 				for _, ac := range ni.AccessConfigs {
 					accessConfigs = append(accessConfigs, map[string]string{
-						"name":       ac.GetName(),
-						"nat_ip":     ac.GetNatIP(),
-						"type":       ac.GetType(),
+						"name":   ac.GetName(),
+						"nat_ip": ac.GetNatIP(),
+						"type":   ac.GetType(),
 					})
 				}
 				network["access_configs"] = accessConfigs
@@ -213,17 +213,17 @@ func buildGCEConfiguration(inst *computepb.Instance) map[string]interface{} {
 // buildGCSConfiguration creates a comprehensive configuration object for GCS buckets
 func buildGCSConfiguration(attrs *storage.BucketAttrs) map[string]interface{} {
 	config := map[string]interface{}{
-		"bucket_name": attrs.Name,
-		"location":    attrs.Location,
+		"bucket_name":   attrs.Name,
+		"location":      attrs.Location,
 		"storage_class": attrs.StorageClass,
-		"created":     attrs.Created.String(),
+		"created":       attrs.Created.String(),
 	}
 
 	// Encryption
 	if attrs.Encryption != nil {
 		config["encryption"] = map[string]interface{}{
-			"enabled":           true,
-			"default_kms_key":   attrs.Encryption.DefaultKMSKeyName,
+			"enabled":         true,
+			"default_kms_key": attrs.Encryption.DefaultKMSKeyName,
 		}
 	} else {
 		config["encryption"] = map[string]interface{}{
@@ -248,7 +248,7 @@ func buildGCSConfiguration(attrs *storage.BucketAttrs) map[string]interface{} {
 	// IAM configuration
 	if attrs.UniformBucketLevelAccess.Enabled {
 		config["uniform_bucket_level_access"] = map[string]interface{}{
-			"enabled": true,
+			"enabled":     true,
 			"locked_time": attrs.UniformBucketLevelAccess.LockedTime.String(),
 		}
 	} else {
@@ -284,9 +284,9 @@ func buildGCSConfiguration(attrs *storage.BucketAttrs) map[string]interface{} {
 	// Logging
 	if attrs.Logging != nil {
 		config["logging"] = map[string]interface{}{
-			"enabled":       true,
-			"log_bucket":    attrs.Logging.LogBucket,
-			"log_prefix":    attrs.Logging.LogObjectPrefix,
+			"enabled":    true,
+			"log_bucket": attrs.Logging.LogBucket,
+			"log_prefix": attrs.Logging.LogObjectPrefix,
 		}
 	}
 
