@@ -173,6 +173,7 @@ func main() {
 		Baseline:       handlers.NewBaselineHandler(baselineService, log),
 		Vulnerability:  handlers.NewVulnerabilityHandler(vulnerabilityService, log, val),
 		IaC:            handlers.NewIaCHandler(iacService, log, val),
+		Kubernetes:     handlers.NewKubernetesHandler(log, val),
 	}
 
 	// Setup router
