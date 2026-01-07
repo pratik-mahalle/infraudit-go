@@ -25,6 +25,7 @@ type Handlers struct {
 	Vulnerability  *handlers.VulnerabilityHandler
 	IaC            *handlers.IaCHandler
 	Kubernetes     *handlers.KubernetesHandler
+	Billing        *handlers.BillingHandler
 }
 
 func New(cfg *config.Config, log *logger.Logger, h *Handlers) http.Handler {
@@ -189,6 +190,22 @@ func New(cfg *config.Config, log *logger.Logger, h *Handlers) http.Handler {
 			r.Get("/clusters/{clusterId}/pods", h.Kubernetes.ListPods)
 			r.Get("/clusters/{clusterId}/services", h.Kubernetes.ListServices)
 			r.Get("/stats", h.Kubernetes.GetClusterStats)
+		})
+
+		// Billing & Subscription
+		r.Route("/api/v1/billing", func(r chi.Router) {
+			r.Get("/plans", h.Billing.ListPlans)
+			r.Get("/info", h.Billing.GetBillingInfo)
+			r.Post("/subscription", h.Billing.UpdatePlan)
+			r.Post("/checkout", h.Billing.CreateCheckoutSession)
+		})
+
+		// Billing (alias for frontend compatibility)
+		r.Route("/api/billing", func(r chi.Router) {
+			r.Get("/plans", h.Billing.ListPlans)
+			r.Get("/info", h.Billing.GetBillingInfo)
+			r.Post("/subscription", h.Billing.UpdatePlan)
+			r.Post("/checkout", h.Billing.CreateCheckoutSession)
 		})
 	})
 
