@@ -186,14 +186,27 @@ func (s *IaCService) parseTerraform(content []byte) (map[string]interface{}, err
 	}
 
 	// Convert to map for storage
-	return map[string]interface{}{
+	// Use JSON round-trip to ensure consistent types (map[string]interface{})
+	rawResult := map[string]interface{}{
 		"resources":    result.Parsed.Resources,
 		"modules":      result.Parsed.Modules,
 		"variables":    result.Parsed.Variables,
 		"outputs":      result.Parsed.Outputs,
 		"providers":    result.Parsed.Providers,
 		"data_sources": result.Parsed.DataSources,
-	}, nil
+	}
+
+	data, err := json.Marshal(rawResult)
+	if err != nil {
+		return nil, err
+	}
+
+	var finalResult map[string]interface{}
+	if err := json.Unmarshal(data, &finalResult); err != nil {
+		return nil, err
+	}
+
+	return finalResult, nil
 }
 
 // parseCloudFormation parses CloudFormation content
@@ -214,11 +227,23 @@ func (s *IaCService) parseCloudFormation(content []byte) (map[string]interface{}
 	}
 
 	// Convert to map for storage
-	return map[string]interface{}{
+	rawResult := map[string]interface{}{
 		"resources":  result.Parsed.Resources,
 		"parameters": result.Parsed.Parameters,
 		"outputs":    result.Parsed.Outputs,
-	}, nil
+	}
+
+	data, err := json.Marshal(rawResult)
+	if err != nil {
+		return nil, err
+	}
+
+	var finalResult map[string]interface{}
+	if err := json.Unmarshal(data, &finalResult); err != nil {
+		return nil, err
+	}
+
+	return finalResult, nil
 }
 
 // parseKubernetes parses Kubernetes manifest content
@@ -234,10 +259,22 @@ func (s *IaCService) parseKubernetes(content []byte) (map[string]interface{}, er
 	}
 
 	// Convert to map for storage
-	return map[string]interface{}{
+	rawResult := map[string]interface{}{
 		"resources": result.Parsed.Resources,
 		"namespace": result.Parsed.Namespace,
-	}, nil
+	}
+
+	data, err := json.Marshal(rawResult)
+	if err != nil {
+		return nil, err
+	}
+
+	var finalResult map[string]interface{}
+	if err := json.Unmarshal(data, &finalResult); err != nil {
+		return nil, err
+	}
+
+	return finalResult, nil
 }
 
 // saveIaCResources extracts and saves individual resources from parsed IaC
@@ -662,17 +699,17 @@ func (s *IaCService) detectConfigurationDrift(iacRes *iac.IaCResource, actualRes
 		actualValue, exists := actualConfig[key]
 		if !exists {
 			changes = append(changes, map[string]interface{}{
-				"field":       key,
-				"iac_value":   iacValue,
+				"field":        key,
+				"iac_value":    iacValue,
 				"actual_value": nil,
-				"change_type": "missing_in_actual",
+				"change_type":  "missing_in_actual",
 			})
 		} else if !deepEqual(iacValue, actualValue) {
 			changes = append(changes, map[string]interface{}{
-				"field":       key,
-				"iac_value":   iacValue,
+				"field":        key,
+				"iac_value":    iacValue,
 				"actual_value": actualValue,
-				"change_type": "modified",
+				"change_type":  "modified",
 			})
 		}
 	}
@@ -681,10 +718,10 @@ func (s *IaCService) detectConfigurationDrift(iacRes *iac.IaCResource, actualRes
 	for key, actualValue := range actualConfig {
 		if _, exists := iacRes.Configuration[key]; !exists {
 			changes = append(changes, map[string]interface{}{
-				"field":       key,
-				"iac_value":   nil,
+				"field":        key,
+				"iac_value":    nil,
 				"actual_value": actualValue,
-				"change_type": "added_in_actual",
+				"change_type":  "added_in_actual",
 			})
 		}
 	}

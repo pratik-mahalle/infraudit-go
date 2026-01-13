@@ -36,13 +36,23 @@ func NewTestDB(t *testing.T) *sql.DB {
 		updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 	);
 
-	CREATE TABLE IF NOT EXISTS providers (
+	CREATE TABLE IF NOT EXISTS provider_accounts (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		user_id INTEGER NOT NULL,
 		provider VARCHAR(50) NOT NULL,
 		is_connected BOOLEAN DEFAULT FALSE,
-		credentials TEXT,
 		last_synced TIMESTAMP,
+		aws_access_key_id VARCHAR(255),
+		aws_secret_access_key VARCHAR(255),
+		aws_region VARCHAR(50),
+		gcp_project_id VARCHAR(255),
+		gcp_service_account_json TEXT,
+		gcp_region VARCHAR(50),
+		azure_tenant_id VARCHAR(255),
+		azure_client_id VARCHAR(255),
+		azure_client_secret VARCHAR(255),
+		azure_subscription_id VARCHAR(255),
+		azure_location VARCHAR(50),
 		sync_status VARCHAR(50),
 		sync_message TEXT,
 		created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -55,7 +65,7 @@ func NewTestDB(t *testing.T) *sql.DB {
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		user_id INTEGER NOT NULL,
 		provider VARCHAR(50) NOT NULL,
-		resource_type VARCHAR(100) NOT NULL,
+		type VARCHAR(100) NOT NULL,
 		resource_id VARCHAR(255) NOT NULL,
 		name VARCHAR(255) NOT NULL,
 		region VARCHAR(100),
@@ -131,6 +141,47 @@ func NewTestDB(t *testing.T) *sql.DB {
 		created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+	);
+
+	CREATE TABLE IF NOT EXISTS iac_definitions (
+		id VARCHAR(36) PRIMARY KEY,
+		user_id VARCHAR(36) NOT NULL,
+		name VARCHAR(255) NOT NULL,
+		iac_type VARCHAR(50) NOT NULL,
+		file_path TEXT,
+		content TEXT NOT NULL,
+		parsed_resources TEXT,
+		last_parsed TIMESTAMP,
+		created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+	);
+
+	CREATE TABLE IF NOT EXISTS iac_resources (
+		id VARCHAR(36) PRIMARY KEY,
+		iac_definition_id VARCHAR(36) NOT NULL,
+		user_id VARCHAR(36) NOT NULL,
+		resource_type VARCHAR(100) NOT NULL,
+		resource_name VARCHAR(255) NOT NULL,
+		resource_address VARCHAR(255),
+		provider VARCHAR(50),
+		configuration TEXT,
+		created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		FOREIGN KEY (iac_definition_id) REFERENCES iac_definitions(id) ON DELETE CASCADE
+	);
+
+	CREATE TABLE IF NOT EXISTS iac_drift_results (
+		id VARCHAR(36) PRIMARY KEY,
+		user_id VARCHAR(36) NOT NULL,
+		iac_definition_id VARCHAR(36) NOT NULL,
+		iac_resource_id VARCHAR(36),
+		actual_resource_id VARCHAR(36),
+		drift_category VARCHAR(100) NOT NULL,
+		severity VARCHAR(20),
+		details TEXT,
+		status VARCHAR(50) NOT NULL,
+		detected_at TIMESTAMP NOT NULL,
+		resolved_at TIMESTAMP,
+		FOREIGN KEY (iac_definition_id) REFERENCES iac_definitions(id) ON DELETE CASCADE
 	);
 	`
 

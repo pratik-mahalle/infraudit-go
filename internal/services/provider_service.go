@@ -11,11 +11,35 @@ import (
 	cloudproviders "github.com/pratik-mahalle/infraudit/internal/providers"
 )
 
+// CloudProviderClient defines the interface for interacting with cloud providers
+// This allows mocking for tests
+type CloudProviderClient interface {
+	AWSListResources(ctx context.Context, creds cloudproviders.AWSCredentials) ([]resource.Resource, error)
+	AzureListResources(ctx context.Context, creds cloudproviders.AzureCredentials) ([]resource.Resource, error)
+	GCPListResources(ctx context.Context, creds cloudproviders.GCPCredentials) ([]resource.Resource, error)
+}
+
+// DefaultCloudProviderClient is the actual implementation calling provider packages
+type DefaultCloudProviderClient struct{}
+
+func (c *DefaultCloudProviderClient) AWSListResources(ctx context.Context, creds cloudproviders.AWSCredentials) ([]resource.Resource, error) {
+	return cloudproviders.AWSListResources(ctx, creds)
+}
+
+func (c *DefaultCloudProviderClient) AzureListResources(ctx context.Context, creds cloudproviders.AzureCredentials) ([]resource.Resource, error) {
+	return cloudproviders.AzureListResources(ctx, creds)
+}
+
+func (c *DefaultCloudProviderClient) GCPListResources(ctx context.Context, creds cloudproviders.GCPCredentials) ([]resource.Resource, error) {
+	return cloudproviders.GCPListResources(ctx, creds)
+}
+
 // ProviderService implements provider.Service
 type ProviderService struct {
 	providerRepo provider.Repository
 	resourceRepo resource.Repository
 	logger       *logger.Logger
+	client       CloudProviderClient
 }
 
 // NewProviderService creates a new provider service
@@ -24,7 +48,13 @@ func NewProviderService(providerRepo provider.Repository, resourceRepo resource.
 		providerRepo: providerRepo,
 		resourceRepo: resourceRepo,
 		logger:       log,
+		client:       &DefaultCloudProviderClient{},
 	}
+}
+
+// SetClient sets the cloud provider client (used for testing)
+func (s *ProviderService) SetClient(client CloudProviderClient) {
+	s.client = client
 }
 
 // Connect connects a cloud provider account
@@ -142,7 +172,7 @@ func (s *ProviderService) Sync(ctx context.Context, userID int64, providerType s
 			SecretAccessKey: p.Credentials.AWSSecretAccessKey,
 			Region:          p.Credentials.AWSRegion,
 		}
-		res, err := cloudproviders.AWSListResources(ctx, creds)
+		res, err := s.client.AWSListResources(ctx, creds)
 		if err != nil {
 			return errors.Internal("Failed to list AWS resources", err)
 		}
@@ -160,7 +190,7 @@ func (s *ProviderService) Sync(ctx context.Context, userID int64, providerType s
 			SubscriptionID: p.Credentials.AzureSubscriptionID,
 			Location:       p.Credentials.AzureLocation,
 		}
-		res, err := cloudproviders.AzureListResources(ctx, creds)
+		res, err := s.client.AzureListResources(ctx, creds)
 		if err != nil {
 			return errors.Internal("Failed to list Azure resources", err)
 		}
@@ -176,7 +206,7 @@ func (s *ProviderService) Sync(ctx context.Context, userID int64, providerType s
 			ServiceAccountJSON: p.Credentials.GCPServiceAccountJSON,
 			Region:             p.Credentials.GCPRegion,
 		}
-		res, err := cloudproviders.GCPListResources(ctx, creds)
+		res, err := s.client.GCPListResources(ctx, creds)
 		if err != nil {
 			return errors.Internal("Failed to list GCP resources", err)
 		}

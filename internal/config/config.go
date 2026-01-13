@@ -30,6 +30,8 @@ type ServerConfig struct {
 	ShutdownTimeout time.Duration
 	FrontendURL     string
 	Environment     string
+	TLSCertFile     string
+	TLSKeyFile      string
 }
 
 // DatabaseConfig contains database configuration
@@ -50,11 +52,11 @@ type DatabaseConfig struct {
 
 // AuthConfig contains authentication configuration
 type AuthConfig struct {
-	JWTSecret           string
-	AccessTokenExpiry   time.Duration
-	RefreshTokenExpiry  time.Duration
-	BCryptCost          int
-	SessionSecret       string
+	JWTSecret          string
+	AccessTokenExpiry  time.Duration
+	RefreshTokenExpiry time.Duration
+	BCryptCost         int
+	SessionSecret      string
 }
 
 // OAuthConfig contains OAuth provider configuration
@@ -104,9 +106,9 @@ type ProviderConfig struct {
 
 // ScannerConfig contains vulnerability scanner configuration
 type ScannerConfig struct {
-	TrivyPath      string
-	TrivyCacheDir  string
-	NVDAPIKey      string
+	TrivyPath     string
+	TrivyCacheDir string
+	NVDAPIKey     string
 }
 
 // Load loads configuration from environment variables
@@ -123,6 +125,8 @@ func Load() (*Config, error) {
 			ShutdownTimeout: getEnvAsDuration("SERVER_SHUTDOWN_TIMEOUT", 30*time.Second),
 			FrontendURL:     getEnv("FRONTEND_URL", "http://localhost:5173"),
 			Environment:     getEnv("ENVIRONMENT", "development"),
+			TLSCertFile:     getEnv("TLS_CERT_FILE", ""),
+			TLSKeyFile:      getEnv("TLS_KEY_FILE", ""),
 		},
 		Database: DatabaseConfig{
 			Driver:          getEnv("DB_DRIVER", "sqlite"),

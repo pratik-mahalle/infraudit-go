@@ -58,6 +58,10 @@ func AuthMiddleware(jwtSecret string) func(http.Handler) http.Handler {
 			ctx := context.WithValue(r.Context(), UserIDKey, claims.UserID)
 			ctx = context.WithValue(ctx, UserEmailKey, claims.Email)
 
+			// Add audit info to logs
+			AddLogField(w, "user_id", claims.UserID)
+			AddLogField(w, "email", claims.Email)
+
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
@@ -88,6 +92,11 @@ func OptionalAuthMiddleware(jwtSecret string) func(http.Handler) http.Handler {
 				if err == nil {
 					ctx := context.WithValue(r.Context(), UserIDKey, claims.UserID)
 					ctx = context.WithValue(ctx, UserEmailKey, claims.Email)
+
+					// Add audit info to logs
+					AddLogField(w, "user_id", claims.UserID)
+					AddLogField(w, "email", claims.Email)
+
 					r = r.WithContext(ctx)
 				}
 			}

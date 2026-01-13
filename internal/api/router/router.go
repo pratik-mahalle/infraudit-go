@@ -38,6 +38,7 @@ func New(cfg *config.Config, log *logger.Logger, h *Handlers) http.Handler {
 	r.Use(middleware.RequestID())
 	r.Use(middleware.Logger(log))
 	r.Use(middleware.Recovery(log))
+	r.Use(middleware.SecurityHeaders)
 	r.Use(middleware.DefaultCORS(cfg.Server.FrontendURL))
 	r.Use(middleware.RateLimit(100, 200)) // 100 req/sec, burst of 200
 	r.Use(metrics.Middleware)             // Prometheus metrics

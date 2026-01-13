@@ -593,6 +593,15 @@ func (m *MockVulnerabilityRepository) Create(ctx context.Context, vuln *vulnerab
 	return id, nil
 }
 
+func (m *MockVulnerabilityRepository) CreateBatch(ctx context.Context, vulns []*vulnerability.Vulnerability) error {
+	for _, v := range vulns {
+		if _, err := m.Create(ctx, v); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (m *MockVulnerabilityRepository) GetByID(ctx context.Context, userID int64, id int64) (*vulnerability.Vulnerability, error) {
 	v, ok := m.Vulnerabilities[id]
 	if !ok || v.UserID != userID {

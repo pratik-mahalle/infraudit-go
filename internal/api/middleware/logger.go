@@ -12,6 +12,7 @@ type responseWriter struct {
 	http.ResponseWriter
 	statusCode int
 	written    int64
+	fields     map[string]interface{}
 }
 
 func (rw *responseWriter) WriteHeader(code int) {
@@ -25,6 +26,13 @@ func (rw *responseWriter) Write(b []byte) (int, error) {
 	return n, err
 }
 
+// AddLogField adds a field to the request log
+func AddLogField(w http.ResponseWriter, key string, value interface{}) {
+	if rw, ok := w.(*responseWriter); ok {
+		rw.fields[key] = value
+	}
+}
+
 // Logger returns a middleware that logs HTTP requests
 func Logger(log *logger.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
@@ -35,12 +43,15 @@ func Logger(log *logger.Logger) func(http.Handler) http.Handler {
 			wrapped := &responseWriter{
 				ResponseWriter: w,
 				statusCode:     http.StatusOK,
+				fields:         make(map[string]interface{}),
 			}
 
 			// Get request ID from context if available
 			requestID := r.Header.Get("X-Request-ID")
 			if requestID == "" {
-				requestID = r.Context().Value(RequestIDKey).(string)
+				if val := r.Context().Value(RequestIDKey); val != nil {
+					requestID = val.(string)
+				}
 			}
 
 			// Process request
@@ -48,7 +59,8 @@ func Logger(log *logger.Logger) func(http.Handler) http.Handler {
 
 			// Log request details
 			duration := time.Since(start)
-			log.WithFields(map[string]interface{}{
+
+			fields := map[string]interface{}{
 				"method":     r.Method,
 				"path":       r.URL.Path,
 				"query":      r.URL.RawQuery,
@@ -58,7 +70,14 @@ func Logger(log *logger.Logger) func(http.Handler) http.Handler {
 				"ip":         r.RemoteAddr,
 				"user_agent": r.UserAgent(),
 				"request_id": requestID,
-			}).Info("HTTP request")
+			}
+
+			// Merge custom fields
+			for k, v := range wrapped.fields {
+				fields[k] = v
+			}
+
+			log.WithFields(fields).Info("HTTP request")
 		})
 	}
 }

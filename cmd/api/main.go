@@ -220,11 +220,20 @@ func main() {
 	log.Info("Background drift scanner started")
 
 	// Start server in goroutine
+	// Start server in goroutine
 	go func() {
 		log.With("address", srv.Addr).Info("Server starting")
 
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.WithError(err).Fatal("Server failed to start")
+		if cfg.Server.TLSCertFile != "" && cfg.Server.TLSKeyFile != "" {
+			log.Info("TLS enabled, starting HTTPS server")
+			if err := srv.ListenAndServeTLS(cfg.Server.TLSCertFile, cfg.Server.TLSKeyFile); err != nil && err != http.ErrServerClosed {
+				log.WithError(err).Fatal("Server failed to start")
+			}
+		} else {
+			log.Info("TLS disabled, starting HTTP server")
+			if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				log.WithError(err).Fatal("Server failed to start")
+			}
 		}
 	}()
 
