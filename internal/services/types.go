@@ -43,10 +43,11 @@ type TimeRange struct {
 // CloudResource is a normalized representation of a resource discovered from any provider.
 // It is intentionally small and UI-friendly.
 type CloudResource struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	Type     string `json:"type"`
-	Provider string `json:"provider"`
-	Region   string `json:"region"`
-	Status   string `json:"status"`
+	ID            string `json:"id"`
+	Name          string `json:"name"`
+	Type          string `json:"type"`
+	Provider      string `json:"provider"`
+	Region        string `json:"region"`
+	Status        string `json:"status"`
+	Configuration string `json:"configuration"`
 }

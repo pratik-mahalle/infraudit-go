@@ -13,7 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 
-	"github.com/pratik-mahalle/infraudit/internal/services"
+	"github.com/pratik-mahalle/infraudit/internal/domain/resource"
 )
 
 type AWSCredentials struct {
@@ -23,7 +23,7 @@ type AWSCredentials struct {
 }
 
 // AWSListResources fetches EC2 instances and S3 buckets concurrently across regions.
-func AWSListResources(ctx context.Context, creds AWSCredentials) ([]services.CloudResource, error) {
+func AWSListResources(ctx context.Context, creds AWSCredentials) ([]resource.Resource, error) {
 	var cfg aws.Config
 	var err error
 	if creds.AccessKeyID != "" && creds.SecretAccessKey != "" {
@@ -38,7 +38,7 @@ func AWSListResources(ctx context.Context, creds AWSCredentials) ([]services.Clo
 		return nil, err
 	}
 
-	resources := []services.CloudResource{}
+	resources := []resource.Resource{}
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 
@@ -84,8 +84,8 @@ func AWSListResources(ctx context.Context, creds AWSCredentials) ([]services.Clo
 	return resources, nil
 }
 
-func fetchEC2InRegion(ctx context.Context, cfg aws.Config, region string) []services.CloudResource {
-	out := []services.CloudResource{}
+func fetchEC2InRegion(ctx context.Context, cfg aws.Config, region string) []resource.Resource {
+	out := []resource.Resource{}
 	cfgRegional := cfg
 	cfgRegional.Region = region
 	ec2c := ec2.NewFromConfig(cfgRegional)
@@ -122,10 +122,10 @@ func fetchEC2InRegion(ctx context.Context, cfg aws.Config, region string) []serv
 				config := buildEC2Configuration(inst, tags)
 				configJSON, _ := json.Marshal(config)
 
-				out = append(out, services.CloudResource{
-					ID:            id,
+				out = append(out, resource.Resource{
+					ResourceID:    id,
 					Name:          name,
-					Type:          "EC2",
+					Type:          resource.TypeEC2Instance,
 					Provider:      "aws",
 					Region:        region,
 					Status:        state,
@@ -167,12 +167,12 @@ func buildEC2Configuration(inst types.Instance, tags map[string]string) map[stri
 
 	// Network configuration
 	config["network"] = map[string]interface{}{
-		"vpc_id":              ptrString(inst.VpcId),
-		"subnet_id":           ptrString(inst.SubnetId),
-		"private_ip_address":  ptrString(inst.PrivateIpAddress),
-		"public_ip_address":   ptrString(inst.PublicIpAddress),
-		"private_dns_name":    ptrString(inst.PrivateDnsName),
-		"public_dns_name":     ptrString(inst.PublicDnsName),
+		"vpc_id":             ptrString(inst.VpcId),
+		"subnet_id":          ptrString(inst.SubnetId),
+		"private_ip_address": ptrString(inst.PrivateIpAddress),
+		"public_ip_address":  ptrString(inst.PublicIpAddress),
+		"private_dns_name":   ptrString(inst.PrivateDnsName),
+		"public_dns_name":    ptrString(inst.PublicDnsName),
 	}
 
 	// Encryption
@@ -205,8 +205,8 @@ func buildEC2Configuration(inst types.Instance, tags map[string]string) map[stri
 	return config
 }
 
-func fetchS3Buckets(ctx context.Context, cfg aws.Config) []services.CloudResource {
-	out := []services.CloudResource{}
+func fetchS3Buckets(ctx context.Context, cfg aws.Config) []resource.Resource {
+	out := []resource.Resource{}
 	s3c := s3.NewFromConfig(cfg)
 	if resp, err := s3c.ListBuckets(ctx, &s3.ListBucketsInput{}); err == nil {
 		for _, b := range resp.Buckets {
@@ -219,13 +219,13 @@ func fetchS3Buckets(ctx context.Context, cfg aws.Config) []services.CloudResourc
 			config := buildS3Configuration(ctx, s3c, name)
 			configJSON, _ := json.Marshal(config)
 
-			out = append(out, services.CloudResource{
-				ID:            "s3-" + name,
+			out = append(out, resource.Resource{
+				ResourceID:    "s3-" + name,
 				Name:          name,
-				Type:          "S3",
+				Type:          resource.TypeS3Bucket,
 				Provider:      "aws",
 				Region:        cfg.Region,
-				Status:        "available",
+				Status:        resource.StatusActive,
 				Configuration: string(configJSON),
 			})
 		}
@@ -275,11 +275,11 @@ func buildS3Configuration(ctx context.Context, s3c *s3.Client, bucketName string
 	}); err == nil && pabResp.PublicAccessBlockConfiguration != nil {
 		pab := pabResp.PublicAccessBlockConfiguration
 		config["public_access"] = map[string]interface{}{
-			"block_public_acls":        pab.BlockPublicAcls,
-			"ignore_public_acls":       pab.IgnorePublicAcls,
-			"block_public_policy":      pab.BlockPublicPolicy,
-			"restrict_public_buckets":  pab.RestrictPublicBuckets,
-			"public_access_blocked":    pab.BlockPublicAcls && pab.IgnorePublicAcls && pab.BlockPublicPolicy && pab.RestrictPublicBuckets,
+			"block_public_acls":       pab.BlockPublicAcls,
+			"ignore_public_acls":      pab.IgnorePublicAcls,
+			"block_public_policy":     pab.BlockPublicPolicy,
+			"restrict_public_buckets": pab.RestrictPublicBuckets,
+			"public_access_blocked":   ptrBool(pab.BlockPublicAcls) && ptrBool(pab.IgnorePublicAcls) && ptrBool(pab.BlockPublicPolicy) && ptrBool(pab.RestrictPublicBuckets),
 		}
 	} else {
 		config["public_access"] = map[string]interface{}{
