@@ -142,7 +142,8 @@ func (r *AlertRepository) List(ctx context.Context, userID int64, filter alert.F
 	}
 	defer rows.Close()
 
-	var alerts []*alert.Alert
+	// Pre-allocate slice with reasonable capacity
+	alerts := make([]*alert.Alert, 0, 100)
 	for rows.Next() {
 		var a alert.Alert
 		var timestamp string
@@ -195,7 +196,8 @@ func (r *AlertRepository) ListWithPagination(ctx context.Context, userID int64, 
 	}
 	defer rows.Close()
 
-	var alerts []*alert.Alert
+	// Pre-allocate slice with expected capacity
+	alerts := make([]*alert.Alert, 0, limit)
 	for rows.Next() {
 		var a alert.Alert
 		var timestamp string

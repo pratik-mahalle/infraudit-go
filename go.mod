@@ -18,7 +18,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.75.0
 	github.com/gin-gonic/gin v1.11.0
 	github.com/go-chi/chi/v5 v5.2.2
-	github.com/go-chi/cors v1.2.1
 	github.com/go-playground/validator/v10 v10.28.0
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/google/uuid v1.6.0
@@ -100,6 +99,7 @@ require (
 	github.com/goccy/go-yaml v1.18.0 // indirect
 	github.com/google/pprof v0.0.0-20241029153458-d1b30febd7db // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
+	github.com/google/uuid v1.6.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.6 // indirect
 	github.com/googleapis/gax-go/v2 v2.15.0 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect

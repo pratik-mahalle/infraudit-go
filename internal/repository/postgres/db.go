@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/pratik-mahalle/infraudit/internal/config"
+	_ "github.com/lib/pq"
 	_ "modernc.org/sqlite"
 )
 
