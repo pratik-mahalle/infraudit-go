@@ -67,10 +67,7 @@ func (h *DriftHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	dtos := make([]dto.DriftDTO, len(drifts))
 	for i, d := range drifts {
-		dtos[i] = dto.DriftDTO{
-			ID: d.ID, ResourceID: d.ResourceID, DriftType: d.DriftType, Severity: d.Severity,
-			Details: d.Details, DetectedAt: d.DetectedAt, Status: d.Status,
-		}
+		dtos[i] = convertDriftToDTO(d)
 	}
 
 	utils.WriteSuccess(w, http.StatusOK, utils.NewPaginatedResponse(dtos, page, pageSize, total))
@@ -101,10 +98,7 @@ func (h *DriftHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	utils.WriteSuccess(w, http.StatusOK, dto.DriftDTO{
-		ID: d.ID, ResourceID: d.ResourceID, DriftType: d.DriftType, Severity: d.Severity,
-		Details: d.Details, DetectedAt: d.DetectedAt, Status: d.Status,
-	})
+	utils.WriteSuccess(w, http.StatusOK, convertDriftToDTO(d))
 }
 
 // Create creates a new drift
@@ -263,4 +257,51 @@ func (h *DriftHandler) Detect(w http.ResponseWriter, r *http.Request) {
 	utils.WriteSuccess(w, http.StatusOK, map[string]string{
 		"message": "Drift detection completed successfully",
 	})
+}
+
+// convertDriftToDTO converts a drift domain model to DTO
+func convertDriftToDTO(d *drift.Drift) dto.DriftDTO {
+	return dto.DriftDTO{
+		ID:            d.ID,
+		ResourceID:    0, // Will be populated if we have numeric ID
+		ResourceIDStr: d.ResourceID,
+		DriftType:     d.DriftType,
+		Severity:      d.Severity,
+		Description:   d.Details,
+		DetectedAt:    d.DetectedAt,
+		Status:        d.Status,
+		RemediationTips: getRemediationTips(d.DriftType, d.Severity),
+	}
+}
+
+// getRemediationTips returns remediation suggestions based on drift type
+func getRemediationTips(driftType, severity string) []string {
+	tips := []string{}
+	
+	switch driftType {
+	case "encryption":
+		tips = append(tips, "Re-enable encryption on the affected resource")
+		tips = append(tips, "Review encryption policies and ensure compliance")
+	case "security_group":
+		tips = append(tips, "Review and restrict security group rules")
+		tips = append(tips, "Remove any 0.0.0.0/0 ingress rules if not required")
+	case "iam_policy":
+		tips = append(tips, "Review IAM policy changes for least privilege")
+		tips = append(tips, "Audit who made the changes and why")
+	case "network_rule":
+		tips = append(tips, "Review network configuration changes")
+		tips = append(tips, "Ensure network segmentation is maintained")
+	case "public_access":
+		tips = append(tips, "Disable public access if not required")
+		tips = append(tips, "Implement proper access controls")
+	default:
+		tips = append(tips, "Review the configuration change")
+		tips = append(tips, "Verify if the change was authorized")
+	}
+	
+	if severity == "critical" {
+		tips = append([]string{"URGENT: Address this drift immediately"}, tips...)
+	}
+	
+	return tips
 }

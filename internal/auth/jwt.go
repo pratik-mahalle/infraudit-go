@@ -26,9 +26,13 @@ func MintTokens(userID int64, email, secret string, accessTTL, refreshTTL time.D
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	})
-	refresh := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{
-		ExpiresAt: jwt.NewNumericDate(time.Now().Add(refreshTTL)),
-		IssuedAt:  jwt.NewNumericDate(time.Now()),
+	refresh := jwt.NewWithClaims(jwt.SigningMethodHS256, Claims{
+		UserID: userID,
+		Email:  email,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(refreshTTL)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+		},
 	})
 	at, err := access.SignedString([]byte(secret))
 	if err != nil {

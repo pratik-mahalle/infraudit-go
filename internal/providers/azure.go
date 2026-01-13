@@ -10,7 +10,7 @@ import (
 	armresources "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources"
 	armstorage "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/storage/armstorage"
 
-	"github.com/pratik-mahalle/infraudit/internal/services"
+	"github.com/pratik-mahalle/infraudit/internal/domain/resource"
 )
 
 type AzureCredentials struct {
@@ -21,13 +21,13 @@ type AzureCredentials struct {
 	Location       string
 }
 
-func AzureListResources(ctx context.Context, creds AzureCredentials) ([]services.CloudResource, error) {
+func AzureListResources(ctx context.Context, creds AzureCredentials) ([]resource.Resource, error) {
 	cred, err := azidentity.NewClientSecretCredential(creds.TenantID, creds.ClientID, creds.ClientSecret, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	var out []services.CloudResource
+	var out []resource.Resource
 
 	rgClient, err := armresources.NewResourceGroupsClient(creds.SubscriptionID, cred, nil)
 	if err != nil {
@@ -70,13 +70,13 @@ func AzureListResources(ctx context.Context, creds AzureCredentials) ([]services
 						config := buildAzureVMConfiguration(vm)
 						configJSON, _ := json.Marshal(config)
 
-						out = append(out, services.CloudResource{
-							ID:            id,
+						out = append(out, resource.Resource{
+							ResourceID:    id,
 							Name:          name,
-							Type:          "VM",
+							Type:          resource.TypeAzureVM,
 							Provider:      "azure",
 							Region:        region,
-							Status:        "unknown",
+							Status:        resource.StatusUnknown,
 							Configuration: string(configJSON),
 						})
 					}
@@ -112,13 +112,13 @@ func AzureListResources(ctx context.Context, creds AzureCredentials) ([]services
 						config := buildAzureVMSSConfiguration(ss)
 						configJSON, _ := json.Marshal(config)
 
-						out = append(out, services.CloudResource{
-							ID:            id,
+						out = append(out, resource.Resource{
+							ResourceID:    id,
 							Name:          name,
-							Type:          "VMSS",
+							Type:          "azure-vmss",
 							Provider:      "azure",
 							Region:        region,
-							Status:        "unknown",
+							Status:        resource.StatusUnknown,
 							Configuration: string(configJSON),
 						})
 					}
@@ -154,13 +154,13 @@ func AzureListResources(ctx context.Context, creds AzureCredentials) ([]services
 						config := buildAzureStorageConfiguration(acc)
 						configJSON, _ := json.Marshal(config)
 
-						out = append(out, services.CloudResource{
-							ID:            id,
+						out = append(out, resource.Resource{
+							ResourceID:    id,
 							Name:          name,
-							Type:          "Storage",
+							Type:          resource.TypeAzureStorage,
 							Provider:      "azure",
 							Region:        region,
-							Status:        "available",
+							Status:        resource.StatusActive,
 							Configuration: string(configJSON),
 						})
 					}

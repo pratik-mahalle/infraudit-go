@@ -1,0 +1,86 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: infraudit-api
+  namespace: infraudit
+  labels:
+    app.kubernetes.io/name: infraudit
+    app.kubernetes.io/component: api
+  annotations:
+    # NGINX Ingress Controller annotations
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    
+    # Rate limiting
+    nginx.ingress.kubernetes.io/limit-rps: "100"
+    nginx.ingress.kubernetes.io/limit-connections: "50"
+    
+    # CORS (if needed - usually handled by app)
+    # nginx.ingress.kubernetes.io/enable-cors: "true"
+    # nginx.ingress.kubernetes.io/cors-allow-origin: "https://infraudit.example.com"
+    
+    # TLS with cert-manager
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    
+    # For AWS ALB Ingress Controller, use these instead:
+    # kubernetes.io/ingress.class: alb
+    # alb.ingress.kubernetes.io/scheme: internet-facing
+    # alb.ingress.kubernetes.io/target-type: ip
+    # alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:...
+    # alb.ingress.kubernetes.io/healthcheck-path: /healthz
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - api.infraudit.example.com
+      secretName: infraudit-api-tls
+  rules:
+    - host: api.infraudit.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: infraudit-api
+                port:
+                  name: http
+
+---
+# WebSocket endpoint (for real-time drift notifications)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: infraudit-websocket
+  namespace: infraudit
+  labels:
+    app.kubernetes.io/name: infraudit
+    app.kubernetes.io/component: api
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    # Enable WebSocket proxying
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+    nginx.ingress.kubernetes.io/upstream-hash-by: "$binary_remote_addr"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - api.infraudit.example.com
+      secretName: infraudit-api-tls
+  rules:
+    - host: api.infraudit.example.com
+      http:
+        paths:
+          - path: /ws
+            pathType: Prefix
+            backend:
+              service:
+                name: infraudit-api
+                port:
+                  name: http

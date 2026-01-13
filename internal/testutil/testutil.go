@@ -4,12 +4,12 @@ import (
 	"database/sql"
 	"testing"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 // NewTestDB creates an in-memory SQLite database for testing
 func NewTestDB(t *testing.T) *sql.DB {
-	db, err := sql.Open("sqlite3", ":memory:")
+	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
 	}

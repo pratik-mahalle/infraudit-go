@@ -3,14 +3,17 @@ package testutil
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/pratik-mahalle/infraudit/internal/domain/alert"
 	"github.com/pratik-mahalle/infraudit/internal/domain/anomaly"
+	"github.com/pratik-mahalle/infraudit/internal/domain/baseline"
 	"github.com/pratik-mahalle/infraudit/internal/domain/drift"
 	"github.com/pratik-mahalle/infraudit/internal/domain/provider"
 	"github.com/pratik-mahalle/infraudit/internal/domain/recommendation"
 	"github.com/pratik-mahalle/infraudit/internal/domain/resource"
 	"github.com/pratik-mahalle/infraudit/internal/domain/user"
+	"github.com/pratik-mahalle/infraudit/internal/domain/vulnerability"
 )
 
 // MockUserRepository is a mock implementation of user.Repository
@@ -485,10 +488,278 @@ func (m *MockProviderRepository) Delete(ctx context.Context, userID int64, provi
 	return nil
 }
 
-func (m *MockProviderRepository) UpdateSyncStatus(ctx context.Context, userID int64, providerType string, lastSynced interface{}) error {
+func (m *MockProviderRepository) UpdateSyncStatus(ctx context.Context, userID int64, providerType string, lastSynced time.Time) error {
 	if p, ok := m.Providers[providerType]; ok && p.UserID == userID {
-		// Update last synced
+		p.LastSynced = &lastSynced
 		return nil
 	}
 	return fmt.Errorf("provider not found")
+}
+
+func (m *MockProviderRepository) UpdateConnectionStatus(ctx context.Context, userID int64, providerType string, isConnected bool) error {
+	if p, ok := m.Providers[providerType]; ok && p.UserID == userID {
+		p.IsConnected = isConnected
+		return nil
+	}
+	return fmt.Errorf("provider not found")
+}
+
+// MockBaselineRepository is a mock implementation of baseline.Repository
+type MockBaselineRepository struct {
+	Baselines map[string]*baseline.Baseline // key is userID:resourceID:baselineType
+	NextID    int64
+}
+
+func NewMockBaselineRepository() *MockBaselineRepository {
+	return &MockBaselineRepository{
+		Baselines: make(map[string]*baseline.Baseline),
+		NextID:    1,
+	}
+}
+
+func (m *MockBaselineRepository) key(userID int64, resourceID string, baselineType string) string {
+	return fmt.Sprintf("%d:%s:%s", userID, resourceID, baselineType)
+}
+
+func (m *MockBaselineRepository) Create(ctx context.Context, b *baseline.Baseline) (int64, error) {
+	id := m.NextID
+	m.NextID++
+	b.ID = id
+	key := m.key(b.UserID, b.ResourceID, b.BaselineType)
+	m.Baselines[key] = b
+	return id, nil
+}
+
+func (m *MockBaselineRepository) GetByResourceID(ctx context.Context, userID int64, resourceID string, baselineType string) (*baseline.Baseline, error) {
+	key := m.key(userID, resourceID, baselineType)
+	b, ok := m.Baselines[key]
+	if !ok {
+		return nil, fmt.Errorf("Baseline not found")
+	}
+	return b, nil
+}
+
+func (m *MockBaselineRepository) Update(ctx context.Context, b *baseline.Baseline) error {
+	key := m.key(b.UserID, b.ResourceID, b.BaselineType)
+	if _, ok := m.Baselines[key]; !ok {
+		return fmt.Errorf("baseline not found")
+	}
+	m.Baselines[key] = b
+	return nil
+}
+
+func (m *MockBaselineRepository) Delete(ctx context.Context, userID int64, id int64) error {
+	for key, b := range m.Baselines {
+		if b.ID == id && b.UserID == userID {
+			delete(m.Baselines, key)
+			return nil
+		}
+	}
+	return nil
+}
+
+func (m *MockBaselineRepository) List(ctx context.Context, userID int64) ([]*baseline.Baseline, error) {
+	var result []*baseline.Baseline
+	for _, b := range m.Baselines {
+		if b.UserID == userID {
+			result = append(result, b)
+		}
+	}
+	return result, nil
+}
+
+// MockVulnerabilityRepository is a mock implementation of vulnerability.Repository
+type MockVulnerabilityRepository struct {
+	Vulnerabilities map[int64]*vulnerability.Vulnerability
+	Scans           map[int64]*vulnerability.VulnerabilityScan
+	NextID          int64
+	NextScanID      int64
+}
+
+func NewMockVulnerabilityRepository() *MockVulnerabilityRepository {
+	return &MockVulnerabilityRepository{
+		Vulnerabilities: make(map[int64]*vulnerability.Vulnerability),
+		Scans:           make(map[int64]*vulnerability.VulnerabilityScan),
+		NextID:          1,
+		NextScanID:      1,
+	}
+}
+
+func (m *MockVulnerabilityRepository) Create(ctx context.Context, vuln *vulnerability.Vulnerability) (int64, error) {
+	id := m.NextID
+	m.NextID++
+	vuln.ID = id
+	m.Vulnerabilities[id] = vuln
+	return id, nil
+}
+
+func (m *MockVulnerabilityRepository) GetByID(ctx context.Context, userID int64, id int64) (*vulnerability.Vulnerability, error) {
+	v, ok := m.Vulnerabilities[id]
+	if !ok || v.UserID != userID {
+		return nil, fmt.Errorf("vulnerability not found")
+	}
+	return v, nil
+}
+
+func (m *MockVulnerabilityRepository) Update(ctx context.Context, vuln *vulnerability.Vulnerability) error {
+	if _, ok := m.Vulnerabilities[vuln.ID]; !ok {
+		return fmt.Errorf("vulnerability not found")
+	}
+	m.Vulnerabilities[vuln.ID] = vuln
+	return nil
+}
+
+func (m *MockVulnerabilityRepository) Delete(ctx context.Context, userID int64, id int64) error {
+	delete(m.Vulnerabilities, id)
+	return nil
+}
+
+func (m *MockVulnerabilityRepository) List(ctx context.Context, userID int64, filter vulnerability.Filter) ([]*vulnerability.Vulnerability, error) {
+	var result []*vulnerability.Vulnerability
+	for _, v := range m.Vulnerabilities {
+		if v.UserID == userID {
+			if filter.Severity != "" && v.Severity != filter.Severity {
+				continue
+			}
+			if filter.Status != "" && v.Status != filter.Status {
+				continue
+			}
+			result = append(result, v)
+		}
+	}
+	return result, nil
+}
+
+func (m *MockVulnerabilityRepository) ListWithPagination(ctx context.Context, userID int64, filter vulnerability.Filter, limit, offset int) ([]*vulnerability.Vulnerability, int64, error) {
+	vulns, _ := m.List(ctx, userID, filter)
+	return vulns, int64(len(vulns)), nil
+}
+
+func (m *MockVulnerabilityRepository) UpdateStatus(ctx context.Context, userID int64, id int64, status string, resolvedAt *string) error {
+	v, ok := m.Vulnerabilities[id]
+	if !ok || v.UserID != userID {
+		return fmt.Errorf("vulnerability not found")
+	}
+	v.Status = status
+	return nil
+}
+
+func (m *MockVulnerabilityRepository) CountBySeverity(ctx context.Context, userID int64) (*vulnerability.SeveritySummary, error) {
+	summary := &vulnerability.SeveritySummary{}
+	for _, v := range m.Vulnerabilities {
+		if v.UserID == userID {
+			switch v.Severity {
+			case vulnerability.SeverityCritical:
+				summary.Critical++
+			case vulnerability.SeverityHigh:
+				summary.High++
+			case vulnerability.SeverityMedium:
+				summary.Medium++
+			case vulnerability.SeverityLow:
+				summary.Low++
+			}
+			summary.Total++
+		}
+	}
+	return summary, nil
+}
+
+func (m *MockVulnerabilityRepository) CountByStatus(ctx context.Context, userID int64) (*vulnerability.StatusSummary, error) {
+	summary := &vulnerability.StatusSummary{}
+	for _, v := range m.Vulnerabilities {
+		if v.UserID == userID {
+			switch v.Status {
+			case vulnerability.StatusOpen:
+				summary.Open++
+			case vulnerability.StatusPatched:
+				summary.Patched++
+			case vulnerability.StatusIgnored:
+				summary.Ignored++
+			}
+			summary.Total++
+		}
+	}
+	return summary, nil
+}
+
+func (m *MockVulnerabilityRepository) GetTopVulnerabilities(ctx context.Context, userID int64, limit int) ([]*vulnerability.Vulnerability, error) {
+	var result []*vulnerability.Vulnerability
+	for _, v := range m.Vulnerabilities {
+		if v.UserID == userID && v.Severity == vulnerability.SeverityCritical {
+			result = append(result, v)
+			if len(result) >= limit {
+				break
+			}
+		}
+	}
+	return result, nil
+}
+
+func (m *MockVulnerabilityRepository) ListByResource(ctx context.Context, userID int64, resourceID string) ([]*vulnerability.Vulnerability, error) {
+	var result []*vulnerability.Vulnerability
+	for _, v := range m.Vulnerabilities {
+		if v.UserID == userID && v.ResourceID == resourceID {
+			result = append(result, v)
+		}
+	}
+	return result, nil
+}
+
+func (m *MockVulnerabilityRepository) CountByResource(ctx context.Context, userID int64, resourceID string) (int64, error) {
+	vulns, _ := m.ListByResource(ctx, userID, resourceID)
+	return int64(len(vulns)), nil
+}
+
+func (m *MockVulnerabilityRepository) CreateScan(ctx context.Context, scan *vulnerability.VulnerabilityScan) (int64, error) {
+	id := m.NextScanID
+	m.NextScanID++
+	scan.ID = id
+	m.Scans[id] = scan
+	return id, nil
+}
+
+func (m *MockVulnerabilityRepository) GetScanByID(ctx context.Context, userID int64, id int64) (*vulnerability.VulnerabilityScan, error) {
+	s, ok := m.Scans[id]
+	if !ok || s.UserID != userID {
+		return nil, fmt.Errorf("scan not found")
+	}
+	return s, nil
+}
+
+func (m *MockVulnerabilityRepository) UpdateScan(ctx context.Context, scan *vulnerability.VulnerabilityScan) error {
+	if _, ok := m.Scans[scan.ID]; !ok {
+		return fmt.Errorf("scan not found")
+	}
+	m.Scans[scan.ID] = scan
+	return nil
+}
+
+func (m *MockVulnerabilityRepository) ListScans(ctx context.Context, userID int64, filter vulnerability.ScanFilter) ([]*vulnerability.VulnerabilityScan, error) {
+	var result []*vulnerability.VulnerabilityScan
+	for _, s := range m.Scans {
+		if s.UserID == userID {
+			result = append(result, s)
+		}
+	}
+	return result, nil
+}
+
+func (m *MockVulnerabilityRepository) ListScansWithPagination(ctx context.Context, userID int64, filter vulnerability.ScanFilter, limit, offset int) ([]*vulnerability.VulnerabilityScan, int64, error) {
+	scans, _ := m.ListScans(ctx, userID, filter)
+	return scans, int64(len(scans)), nil
+}
+
+func (m *MockVulnerabilityRepository) GetLatestScan(ctx context.Context, userID int64, resourceID string) (*vulnerability.VulnerabilityScan, error) {
+	var latest *vulnerability.VulnerabilityScan
+	for _, s := range m.Scans {
+		if s.UserID == userID && s.ResourceID == resourceID {
+			if latest == nil || s.ID > latest.ID {
+				latest = s
+			}
+		}
+	}
+	if latest == nil {
+		return nil, fmt.Errorf("no scan found")
+	}
+	return latest, nil
 }

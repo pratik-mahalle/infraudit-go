@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"strconv"
+	"strings"
 
 	compute "cloud.google.com/go/compute/apiv1"
 	"cloud.google.com/go/storage"
@@ -12,7 +13,7 @@ import (
 	"google.golang.org/api/option"
 	computepb "google.golang.org/genproto/googleapis/cloud/compute/v1"
 
-	"github.com/pratik-mahalle/infraudit/internal/services"
+	"github.com/pratik-mahalle/infraudit/internal/domain/resource"
 )
 
 type GCPCredentials struct {
@@ -21,13 +22,13 @@ type GCPCredentials struct {
 	Region             string
 }
 
-func GCPListResources(ctx context.Context, creds GCPCredentials) ([]services.CloudResource, error) {
+func GCPListResources(ctx context.Context, creds GCPCredentials) ([]resource.Resource, error) {
 	var opts []option.ClientOption
 	if creds.ServiceAccountJSON != "" {
 		opts = append(opts, option.WithCredentialsJSON([]byte(creds.ServiceAccountJSON)))
 	}
 
-	var out []services.CloudResource
+	var out []resource.Resource
 
 	// Compute Engine instances across all zones via AggregatedList
 	instClient, err := compute.NewInstancesRESTClient(ctx, opts...)
@@ -57,13 +58,13 @@ func GCPListResources(ctx context.Context, creds GCPCredentials) ([]services.Clo
 				config := buildGCEConfiguration(inst)
 				configJSON, _ := json.Marshal(config)
 
-				out = append(out, services.CloudResource{
-					ID:            id,
+				out = append(out, resource.Resource{
+					ResourceID:    id,
 					Name:          name,
-					Type:          "GCE",
+					Type:          resource.TypeGCEInstance,
 					Provider:      "gcp",
 					Region:        zone,
-					Status:        status,
+					Status:        strings.ToLower(status),
 					Configuration: string(configJSON),
 				})
 			}
@@ -91,13 +92,13 @@ func GCPListResources(ctx context.Context, creds GCPCredentials) ([]services.Clo
 			config := buildGCSConfiguration(battrs)
 			configJSON, _ := json.Marshal(config)
 
-			out = append(out, services.CloudResource{
-				ID:            "gcs-" + battrs.Name,
+			out = append(out, resource.Resource{
+				ResourceID:    "gcs-" + battrs.Name,
 				Name:          battrs.Name,
-				Type:          "GCS",
+				Type:          resource.TypeGCSBucket,
 				Provider:      "gcp",
 				Region:        battrs.Location,
-				Status:        "available",
+				Status:        resource.StatusActive,
 				Configuration: string(configJSON),
 			})
 		}

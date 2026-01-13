@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: infraudit
+  labels:
+    app.kubernetes.io/name: infraudit
+    app.kubernetes.io/component: infrastructure

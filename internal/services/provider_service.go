@@ -8,6 +8,7 @@ import (
 	"github.com/pratik-mahalle/infraudit/internal/domain/resource"
 	"github.com/pratik-mahalle/infraudit/internal/pkg/errors"
 	"github.com/pratik-mahalle/infraudit/internal/pkg/logger"
+	cloudproviders "github.com/pratik-mahalle/infraudit/internal/providers"
 )
 
 // ProviderService implements provider.Service
@@ -127,6 +128,83 @@ func (s *ProviderService) Sync(ctx context.Context, userID int64, providerType s
 		return errors.BadRequest("Provider is not connected")
 	}
 
+	s.logger.WithFields(map[string]interface{}{
+		"user_id":  userID,
+		"provider": providerType,
+	}).Info("Provider sync initiated")
+
+	var resources []*resource.Resource
+
+	switch providerType {
+	case provider.ProviderAWS:
+		creds := cloudproviders.AWSCredentials{
+			AccessKeyID:     p.Credentials.AWSAccessKeyID,
+			SecretAccessKey: p.Credentials.AWSSecretAccessKey,
+			Region:          p.Credentials.AWSRegion,
+		}
+		res, err := cloudproviders.AWSListResources(ctx, creds)
+		if err != nil {
+			return errors.Internal("Failed to list AWS resources", err)
+		}
+		for i := range res {
+			r := &res[i]
+			r.UserID = userID
+			resources = append(resources, r)
+		}
+
+	case provider.ProviderAzure:
+		creds := cloudproviders.AzureCredentials{
+			TenantID:       p.Credentials.AzureTenantID,
+			ClientID:       p.Credentials.AzureClientID,
+			ClientSecret:   p.Credentials.AzureClientSecret,
+			SubscriptionID: p.Credentials.AzureSubscriptionID,
+			Location:       p.Credentials.AzureLocation,
+		}
+		res, err := cloudproviders.AzureListResources(ctx, creds)
+		if err != nil {
+			return errors.Internal("Failed to list Azure resources", err)
+		}
+		for i := range res {
+			r := &res[i]
+			r.UserID = userID
+			resources = append(resources, r)
+		}
+
+	case provider.ProviderGCP:
+		creds := cloudproviders.GCPCredentials{
+			ProjectID:          p.Credentials.GCPProjectID,
+			ServiceAccountJSON: p.Credentials.GCPServiceAccountJSON,
+			Region:             p.Credentials.GCPRegion,
+		}
+		res, err := cloudproviders.GCPListResources(ctx, creds)
+		if err != nil {
+			return errors.Internal("Failed to list GCP resources", err)
+		}
+		for i := range res {
+			r := &res[i]
+			r.UserID = userID
+			resources = append(resources, r)
+		}
+
+	default:
+		return errors.BadRequest("Unsupported provider type")
+	}
+
+	// Save resources in batch
+	if len(resources) > 0 {
+		err = s.resourceRepo.SaveBatch(ctx, userID, providerType, resources)
+		if err != nil {
+			s.logger.ErrorWithErr(err, "Failed to save synced resources")
+			return err
+		}
+	} else {
+		// Even if no resources, we might want to ensure existing ones are cleaned up?
+		// SaveBatch likely handles upserts. We might need logic to delete stale resources.
+		// For now, let's assume SaveBatch or DeleteByProvider usage if strict sync required.
+		// But basic logic is simple sync.
+		s.logger.Infof("No resources found for provider %s", providerType)
+	}
+
 	// Update last synced timestamp
 	now := time.Now()
 	err = s.providerRepo.UpdateSyncStatus(ctx, userID, providerType, now)
@@ -135,12 +213,12 @@ func (s *ProviderService) Sync(ctx context.Context, userID int64, providerType s
 	}
 
 	s.logger.WithFields(map[string]interface{}{
-		"user_id":  userID,
-		"provider": providerType,
-	}).Info("Provider sync initiated")
+		"user_id":        userID,
+		"provider":       providerType,
+		"resource_count": len(resources),
+	}).Info("Provider sync completed")
 
-	// Actual sync would happen here using the cloud provider SDKs
-	return errors.Internal("Provider sync not yet fully implemented", nil)
+	return nil
 }
 
 // GetSyncStatus gets the sync status for all providers

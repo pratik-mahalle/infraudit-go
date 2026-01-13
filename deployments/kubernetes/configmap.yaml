@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: infraudit-config
+  namespace: infraudit
+  labels:
+    app.kubernetes.io/name: infraudit
+    app.kubernetes.io/component: api
+data:
+  # Server Configuration
+  SERVER_HOST: "0.0.0.0"
+  SERVER_PORT: "8080"
+  SERVER_READ_TIMEOUT: "15s"
+  SERVER_WRITE_TIMEOUT: "15s"
+  SERVER_SHUTDOWN_TIMEOUT: "30s"
+  ENVIRONMENT: "production"
+  
+  # Database Configuration
+  DB_DRIVER: "postgres"
+  DB_HOST: "infraudit-postgres"
+  DB_PORT: "5432"
+  DB_NAME: "infraudit"
+  DB_SSLMODE: "require"
+  DB_MAX_OPEN_CONNS: "25"
+  DB_MAX_IDLE_CONNS: "5"
+  DB_CONN_MAX_LIFETIME: "5m"
+  
+  # Redis Configuration
+  REDIS_ENABLED: "true"
+  REDIS_HOST: "infraudit-redis"
+  REDIS_PORT: "6379"
+  REDIS_DB: "0"
+  
+  # Logging Configuration
+  LOG_LEVEL: "info"
+  LOG_FORMAT: "json"
+  LOG_OUTPUT: "stdout"
+  
+  # Frontend URL for CORS
+  FRONTEND_URL: "https://infraudit.example.com"
+  
+  # JWT Configuration
+  JWT_ACCESS_EXPIRY: "15m"
+  JWT_REFRESH_EXPIRY: "168h"
+  BCRYPT_COST: "12"

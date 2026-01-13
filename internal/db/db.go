@@ -22,7 +22,7 @@ func Open(path string) (*DB, error) {
 		return nil, err
 	}
 	repo := &DB{sql: d}
-	if err := repo.migrate(); err != nil {
+	if err := RunMigrations(d); err != nil {
 		_ = d.Close()
 		return nil, err
 	}

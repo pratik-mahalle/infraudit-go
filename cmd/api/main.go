@@ -18,6 +18,8 @@ import (
 	"github.com/pratik-mahalle/infraudit/internal/repository/postgres"
 	"github.com/pratik-mahalle/infraudit/internal/scanners"
 	"github.com/pratik-mahalle/infraudit/internal/services"
+	"github.com/pratik-mahalle/infraudit/internal/worker"
+	"github.com/pratik-mahalle/infraudit/migrations"
 
 	_ "github.com/pratik-mahalle/infraudit/docs" // Swagger docs
 )
@@ -101,6 +103,12 @@ func main() {
 	}
 	defer db.Close()
 
+	// Run database migrations
+	if err := postgres.RunMigrations(db, migrations.GetFS()); err != nil {
+		log.WithError(err).Fatal("Failed to run database migrations")
+	}
+	log.Info("Database migrations completed")
+
 	log.Info("Successfully connected to database")
 
 	// Initialize validator
@@ -160,6 +168,20 @@ func main() {
 	// Initialize recommendation service
 	recommendationService := services.NewRecommendationService(recommendationRepo, recommendationEngine, log)
 
+	// Initialize background drift scanner worker
+	driftScanInterval := 30 * time.Minute // Default: scan every 30 minutes
+	driftScanner := worker.NewDriftScanner(
+		driftService,
+		providerService,
+		userService,
+		userRepo,
+		driftScanInterval,
+		log,
+	)
+	log.WithFields(map[string]interface{}{
+		"interval": driftScanInterval.String(),
+	}).Info("Drift scanner worker initialized")
+
 	// Initialize handlers
 	handlers := &router.Handlers{
 		Health:         handlers.NewHealthHandler(db, log),
@@ -189,6 +211,14 @@ func main() {
 		IdleTimeout:  60 * time.Second,
 	}
 
+	// Create context for background workers
+	workerCtx, workerCancel := context.WithCancel(context.Background())
+	defer workerCancel()
+
+	// Start background drift scanner
+	go driftScanner.Start(workerCtx)
+	log.Info("Background drift scanner started")
+
 	// Start server in goroutine
 	go func() {
 		log.With("address", srv.Addr).Info("Server starting")
@@ -205,11 +235,15 @@ func main() {
 
 	log.Info("Server shutting down...")
 
-	// Graceful shutdown with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
+	// Stop background workers
+	workerCancel()
+	log.Info("Background workers stopped")
 
-	if err := srv.Shutdown(ctx); err != nil {
+	// Graceful shutdown with timeout
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer shutdownCancel()
+
+	if err := srv.Shutdown(shutdownCtx); err != nil {
 		log.WithError(err).Error("Server forced to shutdown")
 	}
 
