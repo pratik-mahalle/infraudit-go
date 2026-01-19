@@ -28,6 +28,10 @@ type Handlers struct {
 	Kubernetes     *handlers.KubernetesHandler
 	Billing        *handlers.BillingHandler
 	WebSocket      *handlers.WebSocketHandler
+	// Phase 5 & 6: Automation & Notifications
+	Job          *handlers.JobHandler
+	Remediation  *handlers.RemediationHandler
+	Notification *handlers.NotificationHandler
 }
 
 func New(cfg *config.Config, log *logger.Logger, h *Handlers) http.Handler {
@@ -219,6 +223,67 @@ func New(cfg *config.Config, log *logger.Logger, h *Handlers) http.Handler {
 			r.Get("/info", h.Billing.GetBillingInfo)
 			r.Post("/subscription", h.Billing.UpdatePlan)
 			r.Post("/checkout", h.Billing.CreateCheckoutSession)
+		})
+
+		// ============================================
+		// Phase 5: Automation & Orchestration
+		// ============================================
+
+		// Scheduled Jobs
+		r.Route("/api/v1/jobs", func(r chi.Router) {
+			r.Get("/", h.Job.ListJobs)
+			r.Post("/", h.Job.CreateJob)
+			r.Get("/types", h.Job.GetJobTypes)
+			r.Get("/{id}", h.Job.GetJob)
+			r.Put("/{id}", h.Job.UpdateJob)
+			r.Delete("/{id}", h.Job.DeleteJob)
+			r.Post("/{id}/run", h.Job.TriggerJob)
+			r.Get("/{id}/executions", h.Job.ListJobExecutions)
+		})
+
+		// Job Executions
+		r.Route("/api/v1/executions", func(r chi.Router) {
+			r.Get("/{id}", h.Job.GetJobExecution)
+			r.Post("/{id}/cancel", h.Job.CancelJobExecution)
+		})
+
+		// Remediation
+		r.Route("/api/v1/remediation", func(r chi.Router) {
+			r.Get("/summary", h.Remediation.GetSummary)
+			r.Get("/pending", h.Remediation.GetPendingApprovals)
+			r.Post("/suggest/drift/{id}", h.Remediation.SuggestForDrift)
+			r.Post("/suggest/vulnerability/{id}", h.Remediation.SuggestForVulnerability)
+			r.Route("/actions", func(r chi.Router) {
+				r.Get("/", h.Remediation.ListActions)
+				r.Post("/", h.Remediation.CreateAction)
+				r.Get("/{id}", h.Remediation.GetAction)
+				r.Post("/{id}/execute", h.Remediation.ExecuteAction)
+				r.Post("/{id}/approve", h.Remediation.ApproveAction)
+				r.Post("/{id}/rollback", h.Remediation.RollbackAction)
+			})
+		})
+
+		// ============================================
+		// Phase 6: Notifications & Integrations
+		// ============================================
+
+		// Notifications
+		r.Route("/api/v1/notifications", func(r chi.Router) {
+			r.Get("/preferences", h.Notification.GetPreferences)
+			r.Put("/preferences/{channel}", h.Notification.UpdatePreference)
+			r.Get("/history", h.Notification.GetHistory)
+			r.Post("/send", h.Notification.SendNotification)
+		})
+
+		// Webhooks
+		r.Route("/api/v1/webhooks", func(r chi.Router) {
+			r.Get("/", h.Notification.ListWebhooks)
+			r.Post("/", h.Notification.CreateWebhook)
+			r.Get("/events", h.Notification.GetAvailableEvents)
+			r.Get("/{id}", h.Notification.GetWebhook)
+			r.Put("/{id}", h.Notification.UpdateWebhook)
+			r.Delete("/{id}", h.Notification.DeleteWebhook)
+			r.Post("/{id}/test", h.Notification.TestWebhook)
 		})
 
 		// ============================================
