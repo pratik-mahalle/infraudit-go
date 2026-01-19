@@ -28,6 +28,10 @@ type Handlers struct {
 	Kubernetes     *handlers.KubernetesHandler
 	Billing        *handlers.BillingHandler
 	WebSocket      *handlers.WebSocketHandler
+	// Phase 3: Cloud Cost Analytics
+	Cost *handlers.CostHandler
+	// Phase 4: Compliance Framework
+	Compliance *handlers.ComplianceHandler
 	// Phase 5 & 6: Automation & Notifications
 	Job          *handlers.JobHandler
 	Remediation  *handlers.RemediationHandler
@@ -223,6 +227,51 @@ func New(cfg *config.Config, log *logger.Logger, h *Handlers) http.Handler {
 			r.Get("/info", h.Billing.GetBillingInfo)
 			r.Post("/subscription", h.Billing.UpdatePlan)
 			r.Post("/checkout", h.Billing.CreateCheckoutSession)
+		})
+
+		// ============================================
+		// Phase 3: Cloud Cost Analytics
+		// ============================================
+
+		// Cost Analytics
+		r.Route("/api/v1/costs", func(r chi.Router) {
+			r.Get("/", h.Cost.GetOverview)
+			r.Get("/trends", h.Cost.GetTrends)
+			r.Get("/forecast", h.Cost.GetForecast)
+			r.Post("/sync", h.Cost.SyncCosts)
+			r.Get("/savings", h.Cost.GetSavings)
+			r.Get("/{provider}", h.Cost.GetByProvider)
+			r.Route("/anomalies", func(r chi.Router) {
+				r.Get("/", h.Cost.ListAnomalies)
+				r.Post("/detect", h.Cost.DetectAnomalies)
+			})
+			r.Route("/optimizations", func(r chi.Router) {
+				r.Get("/", h.Cost.ListOptimizations)
+			})
+		})
+
+		// ============================================
+		// Phase 4: Compliance Framework
+		// ============================================
+
+		// Compliance
+		r.Route("/api/v1/compliance", func(r chi.Router) {
+			r.Get("/overview", h.Compliance.GetOverview)
+			r.Get("/trend", h.Compliance.GetTrend)
+			r.Post("/assess", h.Compliance.RunAssessment)
+			r.Get("/controls/failing", h.Compliance.GetFailingControls)
+			r.Route("/frameworks", func(r chi.Router) {
+				r.Get("/", h.Compliance.ListFrameworks)
+				r.Get("/{id}", h.Compliance.GetFramework)
+				r.Post("/{id}/enable", h.Compliance.EnableFramework)
+				r.Post("/{id}/disable", h.Compliance.DisableFramework)
+				r.Get("/{id}/controls", h.Compliance.ListControls)
+			})
+			r.Route("/assessments", func(r chi.Router) {
+				r.Get("/", h.Compliance.ListAssessments)
+				r.Get("/{id}", h.Compliance.GetAssessment)
+				r.Get("/{id}/export", h.Compliance.ExportAssessment)
+			})
 		})
 
 		// ============================================
