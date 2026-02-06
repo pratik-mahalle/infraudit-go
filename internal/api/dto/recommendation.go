@@ -14,7 +14,7 @@ type RecommendationDTO struct {
 	Impact      string    `json:"impact"`
 	Category    string    `json:"category"`
 	Resources   []string  `json:"resources,omitempty"`
-	CreatedAt   time.Time `json:"created_at"`
+	CreatedAt   time.Time `json:"createdAt"`
 }
 
 // CreateRecommendationRequest represents a recommendation creation request
@@ -49,5 +49,5 @@ type RecommendationListRequest struct {
 	Priority string `json:"priority,omitempty"`
 	Category string `json:"category,omitempty"`
 	Page     int    `json:"page,omitempty"`
-	PageSize int    `json:"page_size,omitempty"`
+	PageSize int    `json:"pageSize,omitempty"`
 }
