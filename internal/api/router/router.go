@@ -400,6 +400,8 @@ func New(cfg *config.Config, log *logger.Logger, h *Handlers) http.Handler {
 		// IaC aliases
 		r.Post("/api/iac/upload", h.IaC.Upload)
 		r.Get("/api/iac/definitions", h.IaC.ListDefinitions)
+		r.Get("/api/iac/definitions/{id}", h.IaC.GetDefinition)
+		r.Delete("/api/iac/definitions/{id}", h.IaC.DeleteDefinition)
 		r.Post("/api/iac/drifts/detect", h.IaC.DetectDrift)
 		r.Get("/api/iac/drifts", h.IaC.ListDrifts)
 		r.Get("/api/iac/drifts/summary", h.IaC.GetDriftSummary)

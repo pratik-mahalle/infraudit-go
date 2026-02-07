@@ -9,21 +9,21 @@ import (
 
 // CostOverviewResponse represents the cost overview response
 type CostOverviewResponse struct {
-	TotalCost        float64            `json:"total_cost"`
-	MonthlyCost      float64            `json:"monthly_cost"`
-	DailyCost        float64            `json:"daily_cost"`
+	TotalCost        float64            `json:"totalCost"`
+	MonthlyCost      float64            `json:"monthlyCost"`
+	DailyCost        float64            `json:"dailyCost"`
 	Currency         string             `json:"currency"`
-	ByProvider       map[string]float64 `json:"by_provider"`
-	TopServices      []ServiceCostDTO   `json:"top_services"`
+	ByProvider       map[string]float64 `json:"byProvider"`
+	TopServices      []ServiceCostDTO   `json:"topServices"`
 	Trend            *CostTrendDTO      `json:"trend,omitempty"`
-	AnomalyCount     int                `json:"anomaly_count"`
-	PotentialSavings float64            `json:"potential_savings"`
+	AnomalyCount     int                `json:"anomalyCount"`
+	PotentialSavings float64            `json:"potentialSavings"`
 }
 
 // ServiceCostDTO represents cost for a specific service
 type ServiceCostDTO struct {
 	Provider    string  `json:"provider,omitempty"`
-	ServiceName string  `json:"service_name"`
+	ServiceName string  `json:"serviceName"`
 	Cost        float64 `json:"cost"`
 	Percentage  float64 `json:"percentage"`
 }
@@ -31,24 +31,24 @@ type ServiceCostDTO struct {
 // CostSummaryResponse represents a cost summary
 type CostSummaryResponse struct {
 	Provider  string             `json:"provider"`
-	TotalCost float64            `json:"total_cost"`
+	TotalCost float64            `json:"totalCost"`
 	Currency  string             `json:"currency"`
 	Period    string             `json:"period"`
-	StartDate string             `json:"start_date"`
-	EndDate   string             `json:"end_date"`
-	ByService map[string]float64 `json:"by_service"`
-	ByRegion  map[string]float64 `json:"by_region"`
+	StartDate string             `json:"startDate"`
+	EndDate   string             `json:"endDate"`
+	ByService map[string]float64 `json:"byService"`
+	ByRegion  map[string]float64 `json:"byRegion"`
 }
 
 // CostTrendDTO represents cost trend data
 type CostTrendDTO struct {
 	Period        string             `json:"period"`
-	CurrentCost   float64            `json:"current_cost"`
-	PreviousCost  float64            `json:"previous_cost"`
+	CurrentCost   float64            `json:"currentCost"`
+	PreviousCost  float64            `json:"previousCost"`
 	Change        float64            `json:"change"`
-	ChangePercent float64            `json:"change_percent"`
+	ChangePercent float64            `json:"changePercent"`
 	Trend         string             `json:"trend"`
-	DataPoints    []CostDataPointDTO `json:"data_points"`
+	DataPoints    []CostDataPointDTO `json:"dataPoints"`
 }
 
 // CostDataPointDTO represents a single cost data point
@@ -61,28 +61,28 @@ type CostDataPointDTO struct {
 type CostForecastResponse struct {
 	Provider        string  `json:"provider"`
 	Period          string  `json:"period"`
-	ForecastedCost  float64 `json:"forecasted_cost"`
-	ConfidenceLevel float64 `json:"confidence_level"`
-	LowerBound      float64 `json:"lower_bound"`
-	UpperBound      float64 `json:"upper_bound"`
+	ForecastedCost  float64 `json:"forecastedCost"`
+	ConfidenceLevel float64 `json:"confidenceLevel"`
+	LowerBound      float64 `json:"lowerBound"`
+	UpperBound      float64 `json:"upperBound"`
 	Currency        string  `json:"currency"`
-	EndDate         string  `json:"end_date"`
+	EndDate         string  `json:"endDate"`
 }
 
 // CostAnomalyResponse represents a cost anomaly
 type CostAnomalyResponse struct {
 	ID           string    `json:"id"`
 	Provider     string    `json:"provider"`
-	ServiceName  string    `json:"service_name"`
-	ResourceID   *string   `json:"resource_id,omitempty"`
-	AnomalyType  string    `json:"anomaly_type"`
-	ExpectedCost float64   `json:"expected_cost"`
-	ActualCost   float64   `json:"actual_cost"`
+	ServiceName  string    `json:"serviceName"`
+	ResourceID   *string   `json:"resourceId,omitempty"`
+	AnomalyType  string    `json:"anomalyType"`
+	ExpectedCost float64   `json:"expectedCost"`
+	ActualCost   float64   `json:"actualCost"`
 	Deviation    float64   `json:"deviation"`
 	Severity     string    `json:"severity"`
 	Status       string    `json:"status"`
 	Notes        string    `json:"notes,omitempty"`
-	DetectedAt   time.Time `json:"detected_at"`
+	DetectedAt   time.Time `json:"detectedAt"`
 }
 
 // ListAnomaliesResponse represents a list of anomalies
@@ -101,14 +101,14 @@ type UpdateCostAnomalyRequest struct {
 type CostOptimizationResponse struct {
 	ID               string          `json:"id"`
 	Provider         string          `json:"provider"`
-	ResourceID       *string         `json:"resource_id,omitempty"`
-	ResourceType     string          `json:"resource_type"`
-	OptimizationType string          `json:"optimization_type"`
+	ResourceID       *string         `json:"resourceId,omitempty"`
+	ResourceType     string          `json:"resourceType"`
+	OptimizationType string          `json:"optimizationType"`
 	Title            string          `json:"title"`
 	Description      string          `json:"description"`
-	CurrentCost      float64         `json:"current_cost"`
-	EstimatedSavings float64         `json:"estimated_savings"`
-	SavingsPercent   float64         `json:"savings_percent"`
+	CurrentCost      float64         `json:"currentCost"`
+	EstimatedSavings float64         `json:"estimatedSavings"`
+	SavingsPercent   float64         `json:"savingsPercent"`
 	Implementation   string          `json:"implementation"`
 	Status           string          `json:"status"`
 	Details          json.RawMessage `json:"details,omitempty"`
@@ -129,7 +129,7 @@ type ComplianceFrameworkResponse struct {
 	Version     string `json:"version"`
 	Description string `json:"description"`
 	Provider    string `json:"provider,omitempty"`
-	IsEnabled   bool   `json:"is_enabled"`
+	IsEnabled   bool   `json:"isEnabled"`
 }
 
 // ListFrameworksResponse represents a list of frameworks
@@ -140,13 +140,13 @@ type ListFrameworksResponse struct {
 // ComplianceControlResponse represents a compliance control
 type ComplianceControlResponse struct {
 	ID           string `json:"id"`
-	ControlID    string `json:"control_id"`
+	ControlID    string `json:"controlId"`
 	Title        string `json:"title"`
 	Description  string `json:"description"`
 	Category     string `json:"category"`
 	Severity     string `json:"severity"`
 	Remediation  string `json:"remediation,omitempty"`
-	ReferenceURL string `json:"reference_url,omitempty"`
+	ReferenceURL string `json:"referenceUrl,omitempty"`
 }
 
 // ListControlsResponse represents a list of controls
@@ -158,14 +158,14 @@ type ListControlsResponse struct {
 // ComplianceAssessmentResponse represents a compliance assessment
 type ComplianceAssessmentResponse struct {
 	ID                    string    `json:"id"`
-	FrameworkID           string    `json:"framework_id"`
-	FrameworkName         string    `json:"framework_name"`
-	AssessmentDate        time.Time `json:"assessment_date"`
-	TotalControls         int       `json:"total_controls"`
-	PassedControls        int       `json:"passed_controls"`
-	FailedControls        int       `json:"failed_controls"`
-	NotApplicableControls int       `json:"not_applicable_controls"`
-	CompliancePercent     float64   `json:"compliance_percent"`
+	FrameworkID           string    `json:"frameworkId"`
+	FrameworkName         string    `json:"frameworkName"`
+	AssessmentDate        time.Time `json:"assessmentDate"`
+	TotalControls         int       `json:"totalControls"`
+	PassedControls        int       `json:"passedControls"`
+	FailedControls        int       `json:"failedControls"`
+	NotApplicableControls int       `json:"notApplicableControls"`
+	CompliancePercent     float64   `json:"compliancePercent"`
 	Status                string    `json:"status"`
 }
 
@@ -177,58 +177,58 @@ type ListAssessmentsResponse struct {
 
 // RunAssessmentRequest represents a request to run an assessment
 type RunAssessmentRequest struct {
-	FrameworkID string `json:"framework_id" validate:"required"`
+	FrameworkID string `json:"frameworkId" validate:"required"`
 }
 
 // ComplianceOverviewResponse represents a compliance overview
 type ComplianceOverviewResponse struct {
-	TotalControls      int                      `json:"total_controls"`
-	PassedControls     int                      `json:"passed_controls"`
-	FailedControls     int                      `json:"failed_controls"`
-	CompliancePercent  float64                  `json:"compliance_percent"`
-	ByFramework        []FrameworkComplianceDTO `json:"by_framework"`
-	TopFailingControls []AssessmentFindingDTO   `json:"top_failing_controls,omitempty"`
-	BySeverity         map[string]int           `json:"by_severity"`
+	TotalControls      int                      `json:"totalControls"`
+	PassedControls     int                      `json:"passedControls"`
+	FailedControls     int                      `json:"failedControls"`
+	CompliancePercent  float64                  `json:"compliancePercent"`
+	ByFramework        []FrameworkComplianceDTO `json:"byFramework"`
+	TopFailingControls []AssessmentFindingDTO   `json:"topFailingControls,omitempty"`
+	BySeverity         map[string]int           `json:"bySeverity"`
 }
 
 // FrameworkComplianceDTO represents compliance status for a framework
 type FrameworkComplianceDTO struct {
-	FrameworkID       string  `json:"framework_id"`
-	FrameworkName     string  `json:"framework_name"`
-	TotalControls     int     `json:"total_controls"`
-	PassedControls    int     `json:"passed_controls"`
-	FailedControls    int     `json:"failed_controls"`
-	CompliancePercent float64 `json:"compliance_percent"`
-	LastAssessment    string  `json:"last_assessment,omitempty"`
+	FrameworkID       string  `json:"frameworkId"`
+	FrameworkName     string  `json:"frameworkName"`
+	TotalControls     int     `json:"totalControls"`
+	PassedControls    int     `json:"passedControls"`
+	FailedControls    int     `json:"failedControls"`
+	CompliancePercent float64 `json:"compliancePercent"`
+	LastAssessment    string  `json:"lastAssessment,omitempty"`
 }
 
 // AssessmentFindingDTO represents a finding in an assessment
 type AssessmentFindingDTO struct {
-	ControlID         string   `json:"control_id"`
-	ControlTitle      string   `json:"control_title"`
+	ControlID         string   `json:"controlId"`
+	ControlTitle      string   `json:"controlTitle"`
 	Category          string   `json:"category"`
 	Severity          string   `json:"severity"`
 	Status            string   `json:"status"`
-	AffectedCount     int      `json:"affected_count"`
-	AffectedResources []string `json:"affected_resources,omitempty"`
+	AffectedCount     int      `json:"affectedCount"`
+	AffectedResources []string `json:"affectedResources,omitempty"`
 	Remediation       string   `json:"remediation"`
 }
 
 // ComplianceTrendResponse represents compliance trend
 type ComplianceTrendResponse struct {
-	FrameworkID   string              `json:"framework_id"`
-	FrameworkName string              `json:"framework_name"`
-	CurrentScore  float64             `json:"current_score"`
-	PreviousScore float64             `json:"previous_score"`
-	ChangePercent float64             `json:"change_percent"`
+	FrameworkID   string              `json:"frameworkId"`
+	FrameworkName string              `json:"frameworkName"`
+	CurrentScore  float64             `json:"currentScore"`
+	PreviousScore float64             `json:"previousScore"`
+	ChangePercent float64             `json:"changePercent"`
 	Trend         string              `json:"trend"`
-	DataPoints    []TrendDataPointDTO `json:"data_points"`
+	DataPoints    []TrendDataPointDTO `json:"dataPoints"`
 }
 
 // TrendDataPointDTO represents a trend data point
 type TrendDataPointDTO struct {
 	Date            string  `json:"date"`
-	ComplianceScore float64 `json:"compliance_score"`
-	PassedControls  int     `json:"passed_controls"`
-	TotalControls   int     `json:"total_controls"`
+	ComplianceScore float64 `json:"complianceScore"`
+	PassedControls  int     `json:"passedControls"`
+	TotalControls   int     `json:"totalControls"`
 }
