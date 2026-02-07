@@ -1,5 +1,4 @@
--- Add configuration field to resources table
-ALTER TABLE resources ADD COLUMN configuration TEXT;
+-- ALTER TABLE resources ADD COLUMN configuration TEXT;
 
 -- Create resource_baselines table
 CREATE TABLE IF NOT EXISTS resource_baselines (

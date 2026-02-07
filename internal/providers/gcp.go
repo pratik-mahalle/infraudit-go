@@ -244,7 +244,7 @@ func buildGCSConfiguration(attrs *storage.BucketAttrs) map[string]interface{} {
 	}
 
 	// Public access prevention
-	config["public_access_prevention"] = string(attrs.PublicAccessPrevention)
+	config["public_access_prevention"] = attrs.PublicAccessPrevention.String()
 
 	// IAM configuration
 	if attrs.UniformBucketLevelAccess.Enabled {

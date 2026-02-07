@@ -1,7 +1,7 @@
 -- Migration 003: Add vulnerability scanning tables
 
 -- Vulnerability scans table (tracks scan execution history)
-CREATE TABLE vulnerability_scans (
+CREATE TABLE IF NOT EXISTS vulnerability_scans (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
     resource_id VARCHAR(255),
@@ -23,7 +23,7 @@ CREATE TABLE vulnerability_scans (
 );
 
 -- Vulnerabilities table (individual vulnerability findings)
-CREATE TABLE vulnerabilities (
+CREATE TABLE IF NOT EXISTS vulnerabilities (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
     scan_id INTEGER,
@@ -70,13 +70,13 @@ CREATE TABLE vulnerabilities (
 );
 
 -- Indexes for efficient queries
-CREATE INDEX idx_vulnerabilities_user_id ON vulnerabilities(user_id);
-CREATE INDEX idx_vulnerabilities_scan_id ON vulnerabilities(scan_id);
-CREATE INDEX idx_vulnerabilities_resource_id ON vulnerabilities(resource_id);
-CREATE INDEX idx_vulnerabilities_severity ON vulnerabilities(severity);
-CREATE INDEX idx_vulnerabilities_status ON vulnerabilities(status);
-CREATE INDEX idx_vulnerabilities_cve_id ON vulnerabilities(cve_id);
-CREATE INDEX idx_vulnerabilities_detected_at ON vulnerabilities(detected_at);
-CREATE INDEX idx_vulnerability_scans_user_id ON vulnerability_scans(user_id);
-CREATE INDEX idx_vulnerability_scans_status ON vulnerability_scans(status);
-CREATE INDEX idx_vulnerability_scans_created_at ON vulnerability_scans(created_at);
+CREATE INDEX IF NOT EXISTS idx_vulnerabilities_user_id ON vulnerabilities(user_id);
+CREATE INDEX IF NOT EXISTS idx_vulnerabilities_scan_id ON vulnerabilities(scan_id);
+CREATE INDEX IF NOT EXISTS idx_vulnerabilities_resource_id ON vulnerabilities(resource_id);
+CREATE INDEX IF NOT EXISTS idx_vulnerabilities_severity ON vulnerabilities(severity);
+CREATE INDEX IF NOT EXISTS idx_vulnerabilities_status ON vulnerabilities(status);
+CREATE INDEX IF NOT EXISTS idx_vulnerabilities_cve_id ON vulnerabilities(cve_id);
+CREATE INDEX IF NOT EXISTS idx_vulnerabilities_detected_at ON vulnerabilities(detected_at);
+CREATE INDEX IF NOT EXISTS idx_vulnerability_scans_user_id ON vulnerability_scans(user_id);
+CREATE INDEX IF NOT EXISTS idx_vulnerability_scans_status ON vulnerability_scans(status);
+CREATE INDEX IF NOT EXISTS idx_vulnerability_scans_created_at ON vulnerability_scans(created_at);

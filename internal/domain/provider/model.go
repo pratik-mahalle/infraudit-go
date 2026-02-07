@@ -25,6 +25,8 @@ type Credentials struct {
 	GCPProjectID          string `json:"gcp_project_id,omitempty"`
 	GCPServiceAccountJSON string `json:"gcp_service_account_json,omitempty"`
 	GCPRegion             string `json:"gcp_region,omitempty"`
+	GCPBillingDataset     string `json:"gcp_billing_dataset,omitempty"`
+	GCPBillingAccountID   string `json:"gcp_billing_account_id,omitempty"`
 
 	// Azure
 	AzureTenantID       string `json:"azure_tenant_id,omitempty"`

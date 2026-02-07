@@ -125,6 +125,10 @@ func main() {
 	baselineRepo := postgres.NewBaselineRepository(db)
 	vulnerabilityRepo := postgres.NewVulnerabilityRepository(db)
 	iacRepo := postgres.NewIaCRepository(db)
+	complianceRepo := postgres.NewComplianceRepository(db)
+	jobRepo := postgres.NewJobRepository(db)
+	remediationRepo := postgres.NewRemediationRepository(db)
+	notificationRepo := postgres.NewNotificationRepository(db)
 
 	// Initialize scanners
 	trivyScanner := scanners.NewTrivyScanner(log, cfg.Scanner.TrivyPath, cfg.Scanner.TrivyCacheDir)
@@ -165,6 +169,22 @@ func main() {
 		log.Info("Recommendation engine initialized")
 	}
 
+	// Initialize cost service
+	costRepo := postgres.NewCostRepository(db)
+	costService := services.NewCostService(costRepo, providerRepo, geminiClient, log)
+
+	// Initialize compliance service
+	complianceService := services.NewComplianceService(complianceRepo, driftRepo, vulnerabilityRepo, log)
+
+	// Initialize job service
+	jobService := services.NewJobService(jobRepo, driftService, providerService, log)
+
+	// Initialize remediation service
+	remediationService := services.NewRemediationService(remediationRepo, driftService, vulnerabilityService, log)
+
+	// Initialize notification service
+	notificationService := services.NewNotificationService(notificationRepo, log, cfg.Provider.SlackWebhookURL)
+
 	// Initialize recommendation service
 	recommendationService := services.NewRecommendationService(recommendationRepo, recommendationEngine, log)
 
@@ -197,6 +217,11 @@ func main() {
 		IaC:            handlers.NewIaCHandler(iacService, log, val),
 		Kubernetes:     handlers.NewKubernetesHandler(log, val),
 		Billing:        handlers.NewBillingHandler(log, val),
+		Cost:           handlers.NewCostHandler(costService, log),
+		Compliance:     handlers.NewComplianceHandler(complianceService, log),
+		Job:            handlers.NewJobHandler(jobService, log),
+		Remediation:    handlers.NewRemediationHandler(remediationService, log),
+		Notification:   handlers.NewNotificationHandler(notificationService, log),
 	}
 
 	// Setup router

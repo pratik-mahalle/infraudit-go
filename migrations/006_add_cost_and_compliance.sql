@@ -25,11 +25,11 @@ CREATE TABLE IF NOT EXISTS resource_costs (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_resource_costs_user_id ON resource_costs(user_id);
-CREATE INDEX idx_resource_costs_resource_id ON resource_costs(resource_id);
-CREATE INDEX idx_resource_costs_cost_date ON resource_costs(cost_date);
-CREATE INDEX idx_resource_costs_provider ON resource_costs(provider);
-CREATE INDEX idx_resource_costs_service_name ON resource_costs(service_name);
+CREATE INDEX IF NOT EXISTS idx_resource_costs_user_id ON resource_costs(user_id);
+CREATE INDEX IF NOT EXISTS idx_resource_costs_resource_id ON resource_costs(resource_id);
+CREATE INDEX IF NOT EXISTS idx_resource_costs_cost_date ON resource_costs(cost_date);
+CREATE INDEX IF NOT EXISTS idx_resource_costs_provider ON resource_costs(provider);
+CREATE INDEX IF NOT EXISTS idx_resource_costs_service_name ON resource_costs(service_name);
 
 -- Cost anomalies table
 CREATE TABLE IF NOT EXISTS cost_anomalies (
@@ -49,9 +49,9 @@ CREATE TABLE IF NOT EXISTS cost_anomalies (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_cost_anomalies_user_id ON cost_anomalies(user_id);
-CREATE INDEX idx_cost_anomalies_status ON cost_anomalies(status);
-CREATE INDEX idx_cost_anomalies_detected_at ON cost_anomalies(detected_at);
+CREATE INDEX IF NOT EXISTS idx_cost_anomalies_user_id ON cost_anomalies(user_id);
+CREATE INDEX IF NOT EXISTS idx_cost_anomalies_status ON cost_anomalies(status);
+CREATE INDEX IF NOT EXISTS idx_cost_anomalies_detected_at ON cost_anomalies(detected_at);
 
 -- Cost optimizations table
 CREATE TABLE IF NOT EXISTS cost_optimizations (
@@ -73,9 +73,9 @@ CREATE TABLE IF NOT EXISTS cost_optimizations (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_cost_optimizations_user_id ON cost_optimizations(user_id);
-CREATE INDEX idx_cost_optimizations_status ON cost_optimizations(status);
-CREATE INDEX idx_cost_optimizations_optimization_type ON cost_optimizations(optimization_type);
+CREATE INDEX IF NOT EXISTS idx_cost_optimizations_user_id ON cost_optimizations(user_id);
+CREATE INDEX IF NOT EXISTS idx_cost_optimizations_status ON cost_optimizations(status);
+CREATE INDEX IF NOT EXISTS idx_cost_optimizations_optimization_type ON cost_optimizations(optimization_type);
 
 -- ========================================
 -- PHASE 4: COMPLIANCE FRAMEWORK
@@ -109,9 +109,9 @@ CREATE TABLE IF NOT EXISTS compliance_controls (
     FOREIGN KEY (framework_id) REFERENCES compliance_frameworks(id) ON DELETE CASCADE
 );
 
-CREATE INDEX idx_compliance_controls_framework_id ON compliance_controls(framework_id);
-CREATE INDEX idx_compliance_controls_category ON compliance_controls(category);
-CREATE INDEX idx_compliance_controls_severity ON compliance_controls(severity);
+CREATE INDEX IF NOT EXISTS idx_compliance_controls_framework_id ON compliance_controls(framework_id);
+CREATE INDEX IF NOT EXISTS idx_compliance_controls_category ON compliance_controls(category);
+CREATE INDEX IF NOT EXISTS idx_compliance_controls_severity ON compliance_controls(severity);
 
 -- Control mappings table (maps security rules to compliance controls)
 CREATE TABLE IF NOT EXISTS compliance_mappings (
@@ -126,8 +126,8 @@ CREATE TABLE IF NOT EXISTS compliance_mappings (
     FOREIGN KEY (control_id) REFERENCES compliance_controls(id) ON DELETE CASCADE
 );
 
-CREATE INDEX idx_compliance_mappings_control_id ON compliance_mappings(control_id);
-CREATE INDEX idx_compliance_mappings_security_rule_type ON compliance_mappings(security_rule_type);
+CREATE INDEX IF NOT EXISTS idx_compliance_mappings_control_id ON compliance_mappings(control_id);
+CREATE INDEX IF NOT EXISTS idx_compliance_mappings_security_rule_type ON compliance_mappings(security_rule_type);
 
 -- Compliance assessments table
 CREATE TABLE IF NOT EXISTS compliance_assessments (
@@ -147,10 +147,10 @@ CREATE TABLE IF NOT EXISTS compliance_assessments (
     FOREIGN KEY (framework_id) REFERENCES compliance_frameworks(id) ON DELETE CASCADE
 );
 
-CREATE INDEX idx_compliance_assessments_user_id ON compliance_assessments(user_id);
-CREATE INDEX idx_compliance_assessments_framework_id ON compliance_assessments(framework_id);
-CREATE INDEX idx_compliance_assessments_assessment_date ON compliance_assessments(assessment_date);
-CREATE INDEX idx_compliance_assessments_status ON compliance_assessments(status);
+CREATE INDEX IF NOT EXISTS idx_compliance_assessments_user_id ON compliance_assessments(user_id);
+CREATE INDEX IF NOT EXISTS idx_compliance_assessments_framework_id ON compliance_assessments(framework_id);
+CREATE INDEX IF NOT EXISTS idx_compliance_assessments_assessment_date ON compliance_assessments(assessment_date);
+CREATE INDEX IF NOT EXISTS idx_compliance_assessments_status ON compliance_assessments(status);
 
 -- ========================================
 -- SEED DATA: Compliance Frameworks
