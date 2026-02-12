@@ -146,3 +146,9 @@ func (c *Client) Drifts() *DriftService {
 func (c *Client) Anomalies() *AnomalyService {
 	return &AnomalyService{client: c}
 }
+
+// DoRaw performs a raw HTTP request to the API.
+// This is useful for endpoints that don't have dedicated service methods.
+func (c *Client) DoRaw(ctx context.Context, method, path string, body interface{}, result interface{}) error {
+	return c.doRequest(ctx, method, path, body, result)
+}

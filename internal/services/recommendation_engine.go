@@ -192,6 +192,11 @@ func (e *RecommendationEngine) generateCostOptimizationRecommendations(ctx conte
 
 // analyzeCostOptimizationBatch analyzes a batch of resources for cost optimization
 func (e *RecommendationEngine) analyzeCostOptimizationBatch(ctx context.Context, userID int64, resources []*resource.Resource) error {
+	// Rule-based fallback when Gemini is not available
+	if e.geminiClient == nil {
+		return e.analyzeCostOptimizationBatchRuleBased(ctx, userID, resources)
+	}
+
 	// Prepare resource data for AI analysis
 	resourceData := make([]map[string]interface{}, 0, len(resources))
 	for _, res := range resources {
@@ -208,7 +213,6 @@ func (e *RecommendationEngine) analyzeCostOptimizationBatch(ctx context.Context,
 	}
 
 	// Batch analyze with Gemini
-	// Use Marshal instead of MarshalIndent for better performance
 	jsonData, err := json.Marshal(map[string]interface{}{
 		"resources": resourceData,
 	})
@@ -247,8 +251,52 @@ Return ONLY a JSON array of recommendations. Be specific with savings estimates.
 		return fmt.Errorf("failed to generate cost recommendations: %w", err)
 	}
 
-	// Parse and save recommendations
 	return e.parseAndSaveRecommendations(ctx, userID, response)
+}
+
+// analyzeCostOptimizationBatchRuleBased generates cost recommendations using heuristics
+func (e *RecommendationEngine) analyzeCostOptimizationBatchRuleBased(ctx context.Context, userID int64, resources []*resource.Resource) error {
+	for _, res := range resources {
+		// Check for stopped/inactive resources
+		if res.Status == "stopped" || res.Status == "inactive" || res.Status == "terminated" {
+			rec := &recommendation.Recommendation{
+				UserID:      userID,
+				Type:        recommendation.TypeCostOptimization,
+				Priority:    recommendation.PriorityMedium,
+				Title:       fmt.Sprintf("Remove or downsize stopped resource: %s", res.Name),
+				Description: fmt.Sprintf("Resource '%s' (%s on %s in %s) is currently %s. Consider removing it or switching to a smaller instance type to save costs.", res.Name, res.Type, res.Provider, res.Region, res.Status),
+				Category:    "unused_resources",
+				Savings:     10.0,
+				Effort:      recommendation.EffortLow,
+				Impact:      recommendation.ImpactMedium,
+				Resources:   []string{res.ResourceID},
+			}
+			if _, err := e.recRepo.Create(ctx, rec); err != nil {
+				e.logger.ErrorWithErr(err, "Failed to save cost recommendation")
+			}
+			continue
+		}
+
+		// Recommend reserved instances for running resources
+		if res.Status == "running" || res.Status == "active" {
+			rec := &recommendation.Recommendation{
+				UserID:      userID,
+				Type:        recommendation.TypeCostOptimization,
+				Priority:    recommendation.PriorityLow,
+				Title:       fmt.Sprintf("Evaluate reserved pricing for: %s", res.Name),
+				Description: fmt.Sprintf("Resource '%s' (%s on %s) is actively running. If this is a long-running workload, consider switching to reserved instances or savings plans for up to 40%% cost reduction.", res.Name, res.Type, res.Provider),
+				Category:    "reserved_instances",
+				Savings:     15.0,
+				Effort:      recommendation.EffortMedium,
+				Impact:      recommendation.ImpactHigh,
+				Resources:   []string{res.ResourceID},
+			}
+			if _, err := e.recRepo.Create(ctx, rec); err != nil {
+				e.logger.ErrorWithErr(err, "Failed to save cost recommendation")
+			}
+		}
+	}
+	return nil
 }
 
 // generateSecurityRecommendations analyzes vulnerabilities for security improvements
@@ -276,39 +324,77 @@ func (e *RecommendationEngine) generateSecurityRecommendations(ctx context.Conte
 
 		totalProcessed += len(vulns)
 
-		for i := 0; i < len(vulns); i += batchSize {
-			end := i + batchSize
-			if end > len(vulns) {
-				end = len(vulns)
-			}
-
-			batch := vulns[i:end]
-
-			vulnData := make([]map[string]interface{}, 0, len(batch))
-			for _, v := range batch {
-				data := map[string]interface{}{
-					"cve_id":          v.CVEID,
-					"title":           v.Title,
-					"severity":        v.Severity,
-					"cvss_score":      v.CVSSScore,
-					"package_name":    v.PackageName,
-					"package_version": v.PackageVersion,
-					"fixed_version":   v.FixedVersion,
-					"resource_id":     v.ResourceID,
-					"resource_type":   v.ResourceType,
+		// Rule-based fallback when Gemini is not available
+		if e.geminiClient == nil {
+			for _, v := range vulns {
+				priority := recommendation.PriorityMedium
+				if v.Severity == "critical" {
+					priority = recommendation.PriorityCritical
+				} else if v.Severity == "high" {
+					priority = recommendation.PriorityHigh
 				}
-				vulnData = append(vulnData, data)
-			}
 
-			response, err := e.geminiClient.AnalyzeVulnerabilitiesForRecommendations(ctx, vulnData)
-			if err != nil {
-				e.logger.ErrorWithErr(err, "Failed to analyze vulnerability batch")
-				continue
-			}
+				title := fmt.Sprintf("Fix %s vulnerability: %s", v.Severity, v.Title)
+				desc := fmt.Sprintf("Vulnerability '%s' (severity: %s) detected on resource %s.", v.Title, v.Severity, v.ResourceID)
+				if v.CVEID != "" {
+					desc += fmt.Sprintf(" CVE: %s.", v.CVEID)
+				}
+				if v.FixedVersion != "" {
+					desc += fmt.Sprintf(" Update %s from %s to %s to remediate.", v.PackageName, v.PackageVersion, v.FixedVersion)
+				}
 
-			if err := e.parseAndSaveRecommendations(ctx, userID, response); err != nil {
-				e.logger.ErrorWithErr(err, "Failed to save vulnerability recommendations")
-				continue
+				rec := &recommendation.Recommendation{
+					UserID:      userID,
+					Type:        recommendation.TypeSecurityImprovement,
+					Priority:    priority,
+					Title:       title,
+					Description: desc,
+					Category:    "vulnerability_remediation",
+					Savings:     0,
+					Effort:      recommendation.EffortMedium,
+					Impact:      recommendation.ImpactHigh,
+					Resources:   []string{v.ResourceID},
+				}
+				if _, err := e.recRepo.Create(ctx, rec); err != nil {
+					e.logger.ErrorWithErr(err, "Failed to save security recommendation")
+				}
+			}
+		} else {
+			// AI-powered analysis
+			for i := 0; i < len(vulns); i += batchSize {
+				end := i + batchSize
+				if end > len(vulns) {
+					end = len(vulns)
+				}
+
+				batch := vulns[i:end]
+
+				vulnData := make([]map[string]interface{}, 0, len(batch))
+				for _, v := range batch {
+					data := map[string]interface{}{
+						"cve_id":          v.CVEID,
+						"title":           v.Title,
+						"severity":        v.Severity,
+						"cvss_score":      v.CVSSScore,
+						"package_name":    v.PackageName,
+						"package_version": v.PackageVersion,
+						"fixed_version":   v.FixedVersion,
+						"resource_id":     v.ResourceID,
+						"resource_type":   v.ResourceType,
+					}
+					vulnData = append(vulnData, data)
+				}
+
+				response, err := e.geminiClient.AnalyzeVulnerabilitiesForRecommendations(ctx, vulnData)
+				if err != nil {
+					e.logger.ErrorWithErr(err, "Failed to analyze vulnerability batch")
+					continue
+				}
+
+				if err := e.parseAndSaveRecommendations(ctx, userID, response); err != nil {
+					e.logger.ErrorWithErr(err, "Failed to save vulnerability recommendations")
+					continue
+				}
 			}
 		}
 
@@ -321,16 +407,13 @@ func (e *RecommendationEngine) generateSecurityRecommendations(ctx context.Conte
 
 	if totalProcessed == 0 {
 		e.logger.Info("No open vulnerabilities found, skipping vulnerability-based security recommendations")
-		// Still generate security recommendations from resource configurations
-		return e.generateResourceSecurityRecommendations(ctx, userID)
 	}
 
-	e.logger.WithFields(map[string]interface{}{
-		"total_vulnerabilities": totalProcessed,
-	}).Info("Processing vulnerabilities for security recommendations")
-
-	// Also generate security recommendations from resource configurations
-	return e.generateResourceSecurityRecommendations(ctx, userID)
+	// Also generate security recommendations from resource configurations (only with AI)
+	if e.geminiClient != nil {
+		return e.generateResourceSecurityRecommendations(ctx, userID)
+	}
+	return nil
 }
 
 // generateResourceSecurityRecommendations analyzes resource configurations for security
@@ -466,36 +549,64 @@ func (e *RecommendationEngine) generateComplianceRecommendations(ctx context.Con
 
 		foundAny = true
 
-		// Process this page in batches
-		for i := 0; i < len(drifts); i += batchSize {
-			end := i + batchSize
-			if end > len(drifts) {
-				end = len(drifts)
-			}
-
-			batch := drifts[i:end]
-
-			driftData := make([]map[string]interface{}, 0, len(batch))
-			for _, d := range batch {
-				data := map[string]interface{}{
-					"resource_id": d.ResourceID,
-					"drift_type":  d.DriftType,
-					"severity":    d.Severity,
-					"details":     d.Details,
-					"detected_at": d.DetectedAt,
+		// Rule-based fallback when Gemini is not available
+		if e.geminiClient == nil {
+			for _, d := range drifts {
+				priority := recommendation.PriorityMedium
+				if d.Severity == "critical" {
+					priority = recommendation.PriorityCritical
+				} else if d.Severity == "high" {
+					priority = recommendation.PriorityHigh
 				}
-				driftData = append(driftData, data)
-			}
 
-			response, err := e.geminiClient.AnalyzeDriftsForRecommendations(ctx, driftData)
-			if err != nil {
-				e.logger.ErrorWithErr(err, "Failed to analyze drift batch")
-				continue
+				rec := &recommendation.Recommendation{
+					UserID:      userID,
+					Type:        recommendation.TypeCompliance,
+					Priority:    priority,
+					Title:       fmt.Sprintf("Resolve %s drift on resource %s", d.Severity, d.ResourceID),
+					Description: fmt.Sprintf("Configuration drift (%s) detected on resource %s with %s severity. Review and remediate to maintain compliance.", d.DriftType, d.ResourceID, d.Severity),
+					Category:    "drift_remediation",
+					Savings:     0,
+					Effort:      recommendation.EffortMedium,
+					Impact:      recommendation.ImpactHigh,
+					Resources:   []string{d.ResourceID},
+				}
+				if _, err := e.recRepo.Create(ctx, rec); err != nil {
+					e.logger.ErrorWithErr(err, "Failed to save compliance recommendation")
+				}
 			}
+		} else {
+			// AI-powered analysis in batches
+			for i := 0; i < len(drifts); i += batchSize {
+				end := i + batchSize
+				if end > len(drifts) {
+					end = len(drifts)
+				}
 
-			if err := e.parseAndSaveRecommendations(ctx, userID, response); err != nil {
-				e.logger.ErrorWithErr(err, "Failed to save compliance recommendations")
-				continue
+				batch := drifts[i:end]
+
+				driftData := make([]map[string]interface{}, 0, len(batch))
+				for _, d := range batch {
+					data := map[string]interface{}{
+						"resource_id": d.ResourceID,
+						"drift_type":  d.DriftType,
+						"severity":    d.Severity,
+						"details":     d.Details,
+						"detected_at": d.DetectedAt,
+					}
+					driftData = append(driftData, data)
+				}
+
+				response, err := e.geminiClient.AnalyzeDriftsForRecommendations(ctx, driftData)
+				if err != nil {
+					e.logger.ErrorWithErr(err, "Failed to analyze drift batch")
+					continue
+				}
+
+				if err := e.parseAndSaveRecommendations(ctx, userID, response); err != nil {
+					e.logger.ErrorWithErr(err, "Failed to save compliance recommendations")
+					continue
+				}
 			}
 		}
 
