@@ -39,7 +39,11 @@ func newAuthLoginCmd() *cobra.Command {
 				email = promptInput("Email: ")
 			}
 			if password == "" {
-				password = promptPassword("Password: ")
+				var err error
+				password, err = promptPassword("Password: ")
+				if err != nil {
+					return err
+				}
 			}
 
 			ctx := context.Background()
@@ -90,8 +94,15 @@ func newAuthRegisterCmd() *cobra.Command {
 				fullName = promptInput("Full name: ")
 			}
 			if password == "" {
-				password = promptPassword("Password: ")
-				confirm := promptPassword("Confirm password: ")
+				var err error
+				password, err = promptPassword("Password: ")
+				if err != nil {
+					return err
+				}
+				confirm, err := promptPassword("Confirm password: ")
+				if err != nil {
+					return err
+				}
 				if password != confirm {
 					return fmt.Errorf("passwords do not match")
 				}
@@ -186,12 +197,12 @@ func promptInput(prompt string) string {
 	return strings.TrimSpace(input)
 }
 
-func promptPassword(prompt string) string {
+func promptPassword(prompt string) (string, error) {
 	fmt.Print(prompt)
 	password, err := term.ReadPassword(int(syscall.Stdin))
 	fmt.Println()
 	if err != nil {
-		return ""
+		return "", fmt.Errorf("failed to read password: %w", err)
 	}
-	return string(password)
+	return string(password), nil
 }

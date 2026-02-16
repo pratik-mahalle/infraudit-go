@@ -72,7 +72,11 @@ func newProviderConnectCmd() *cobra.Command {
 			switch providerType {
 			case "aws":
 				credentials["access_key_id"] = promptInput("AWS Access Key ID: ")
-				credentials["secret_access_key"] = promptPassword("AWS Secret Access Key: ")
+				secretKey, err := promptPassword("AWS Secret Access Key: ")
+				if err != nil {
+					return err
+				}
+				credentials["secret_access_key"] = secretKey
 				region := promptInput("AWS Region [us-east-1]: ")
 				if region == "" {
 					region = "us-east-1"
@@ -84,7 +88,11 @@ func newProviderConnectCmd() *cobra.Command {
 			case "azure":
 				credentials["tenant_id"] = promptInput("Azure Tenant ID: ")
 				credentials["client_id"] = promptInput("Azure Client ID: ")
-				credentials["client_secret"] = promptPassword("Azure Client Secret: ")
+				clientSecret, err := promptPassword("Azure Client Secret: ")
+				if err != nil {
+					return err
+				}
+				credentials["client_secret"] = clientSecret
 				credentials["subscription_id"] = promptInput("Azure Subscription ID: ")
 			default:
 				return fmt.Errorf("unsupported provider type: %s (use aws, gcp, or azure)", providerType)

@@ -77,7 +77,7 @@ func newRecListCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&recType, "type", "", "filter by type (cost, performance, security)")
-	cmd.Flags().StringVar(&impact, "priority", "", "filter by impact (high, medium, low)")
+	cmd.Flags().StringVar(&impact, "impact", "", "filter by impact (high, medium, low)")
 	cmd.Flags().StringVar(&status, "status", "", "filter by status")
 
 	return cmd
