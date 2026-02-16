@@ -53,7 +53,7 @@ func newConfigInitCmd() *cobra.Command {
 				return fmt.Errorf("failed to get home directory: %w", err)
 			}
 
-			configPath := home + "/.infraaudit/config.yaml"
+			configPath := home + "/.infraudit/config.yaml"
 			if err := viper.WriteConfigAs(configPath); err != nil {
 				return fmt.Errorf("failed to write config: %w", err)
 			}
@@ -122,6 +122,6 @@ func writeConfig() error {
 		return fmt.Errorf("failed to get home directory: %w", err)
 	}
 
-	configPath := home + "/.infraaudit/config.yaml"
+	configPath := home + "/.infraudit/config.yaml"
 	return viper.WriteConfigAs(configPath)
 }

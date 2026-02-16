@@ -100,13 +100,13 @@ jobs:
       
       - name: Build binary
         run: |
-          CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o infraaudit ./cmd/api
-      
+          CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o infraudit ./cmd/api
+
       - name: Upload binary artifact
         uses: actions/upload-artifact@v4
         with:
-          name: infraaudit-binary
-          path: infraaudit
+          name: infraudit-binary
+          path: infraudit
 
   docker:
     name: Build Docker Image

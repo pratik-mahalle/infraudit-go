@@ -45,7 +45,7 @@ func Execute() error {
 func init() {
 	cobra.OnInitialize(initConfig)
 
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default $HOME/.infraaudit/config.yaml)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default $HOME/.infraudit/config.yaml)")
 	rootCmd.PersistentFlags().StringVarP(&outputFormat, "output", "o", "table", "output format: table, json, yaml")
 	rootCmd.PersistentFlags().BoolVar(&noColor, "no-color", false, "disable colored output")
 	rootCmd.PersistentFlags().StringVar(&serverURL, "server", "", "server URL (overrides config)")
@@ -82,14 +82,14 @@ func initConfig() {
 			fmt.Fprintln(os.Stderr, "Error:", err)
 			return
 		}
-		configDir := home + "/.infraaudit"
+		configDir := home + "/.infraudit"
 		_ = os.MkdirAll(configDir, 0700)
 		viper.AddConfigPath(configDir)
 		viper.SetConfigName("config")
 		viper.SetConfigType("yaml")
 	}
 
-	viper.SetEnvPrefix("INFRAAUDIT")
+	viper.SetEnvPrefix("INFRAUDIT")
 	viper.AutomaticEnv()
 
 	// Set defaults
@@ -118,7 +118,7 @@ func initAuthenticatedClient() error {
 
 	token := viper.GetString("auth.token")
 	if token == "" {
-		return fmt.Errorf("not authenticated. Run 'infraaudit auth login' first")
+		return fmt.Errorf("not authenticated. Run 'infraudit auth login' first")
 	}
 
 	apiClient.SetToken(token)

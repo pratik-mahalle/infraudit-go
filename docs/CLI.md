@@ -47,8 +47,8 @@ cd infraudit-go
 # Build the CLI binary
 make build-cli
 
-# Binary is at ./bin/infraaudit
-./bin/infraaudit --help
+# Binary is at ./bin/infraudit
+./bin/infraudit --help
 ```
 
 ### Go Install
@@ -62,7 +62,7 @@ The binary will be installed to `$GOPATH/bin/` (or `$HOME/go/bin/` by default). 
 ### Verify Installation
 
 ```bash
-infraaudit --help
+infraudit --help
 ```
 
 ---
@@ -71,34 +71,34 @@ infraaudit --help
 
 ```bash
 # 1. Run first-time setup
-infraaudit config init
+infraudit config init
 # > Enter server URL: http://localhost:8080
 # > Default output format: table
 
 # 2. Login
-infraaudit auth login
+infraudit auth login
 # > Email: user@example.com
 # > Password: ********
 # > Logged in as user@example.com
 
 # 3. Check dashboard
-infraaudit status
+infraudit status
 
 # 4. Connect a cloud provider
-infraaudit provider connect aws
+infraudit provider connect aws
 
 # 5. List resources
-infraaudit resource list
+infraudit resource list
 
 # 6. Run drift detection
-infraaudit drift detect
+infraudit drift detect
 ```
 
 ---
 
 ## Configuration
 
-Configuration is stored at `~/.infraaudit/config.yaml`. It is created automatically during `config init` or `auth login`.
+Configuration is stored at `~/.infraudit/config.yaml`. It is created automatically during `config init` or `auth login`.
 
 ### Config File Structure
 
@@ -117,17 +117,17 @@ The config file is created with `0600` permissions (owner read/write only) to pr
 
 ```bash
 # Interactive setup
-infraaudit config init
+infraudit config init
 
 # Set individual values
-infraaudit config set server_url https://api.infraaudit.dev
-infraaudit config set output json
+infraudit config set server_url https://api.infraudit.dev
+infraudit config set output json
 
 # Read a value
-infraaudit config get server_url
+infraudit config get server_url
 
 # List all values
-infraaudit config list
+infraudit config list
 ```
 
 ---
@@ -140,7 +140,7 @@ These flags are available on every command:
 |------|-------|---------|-------------|
 | `--server` | | (from config) | Override the server URL for this request |
 | `--output` | `-o` | `table` | Output format: `table`, `json`, `yaml` |
-| `--config` | | `~/.infraaudit/config.yaml` | Path to config file |
+| `--config` | | `~/.infraudit/config.yaml` | Path to config file |
 | `--no-color` | | `false` | Disable colored output |
 | `--help` | `-h` | | Show help for any command |
 
@@ -148,16 +148,16 @@ These flags are available on every command:
 
 ```bash
 # Use a different server
-infraaudit --server https://staging.infraaudit.dev status
+infraudit --server https://staging.infraudit.dev status
 
 # Get JSON output
-infraaudit resource list -o json
+infraudit resource list -o json
 
 # Get YAML output
-infraaudit drift list -o yaml
+infraudit drift list -o yaml
 
 # Use a custom config file
-infraaudit --config /path/to/config.yaml status
+infraudit --config /path/to/config.yaml status
 ```
 
 ---
@@ -181,7 +181,7 @@ ID  NAME            TYPE     REGION      STATUS         PROVIDER
 Machine-readable JSON (use with `jq` for filtering):
 
 ```bash
-infraaudit resource list -o json | jq '.[].name'
+infraudit resource list -o json | jq '.[].name'
 ```
 
 ### YAML
@@ -189,7 +189,7 @@ infraaudit resource list -o json | jq '.[].name'
 YAML output:
 
 ```bash
-infraaudit drift get 1 -o yaml
+infraudit drift get 1 -o yaml
 ```
 
 ---
@@ -198,7 +198,7 @@ infraaudit drift get 1 -o yaml
 
 ### auth
 
-Authentication commands. Credentials are stored securely in `~/.infraaudit/config.yaml`.
+Authentication commands. Credentials are stored securely in `~/.infraudit/config.yaml`.
 
 #### `auth login`
 
@@ -206,10 +206,10 @@ Login with email and password. If flags are not provided, prompts interactively 
 
 ```bash
 # Interactive
-infraaudit auth login
+infraudit auth login
 
 # Non-interactive
-infraaudit auth login --email user@example.com --password mypassword
+infraudit auth login --email user@example.com --password mypassword
 ```
 
 | Flag | Description |
@@ -223,10 +223,10 @@ Create a new account.
 
 ```bash
 # Interactive
-infraaudit auth register
+infraudit auth register
 
 # Non-interactive
-infraaudit auth register --email user@example.com --name "John Doe" --password mypassword
+infraudit auth register --email user@example.com --name "John Doe" --password mypassword
 ```
 
 | Flag | Description |
@@ -240,7 +240,7 @@ infraaudit auth register --email user@example.com --name "John Doe" --password m
 Clear stored credentials from config.
 
 ```bash
-infraaudit auth logout
+infraudit auth logout
 ```
 
 #### `auth whoami`
@@ -248,7 +248,7 @@ infraaudit auth logout
 Display current authenticated user info.
 
 ```bash
-infraaudit auth whoami
+infraudit auth whoami
 ```
 
 ---
@@ -271,7 +271,7 @@ Manage CLI configuration. See [Configuration](#configuration) section for detail
 Show a dashboard summary of your InfraAudit account.
 
 ```bash
-infraaudit status
+infraudit status
 ```
 
 Output:
@@ -296,7 +296,7 @@ Manage cloud provider connections (AWS, GCP, Azure).
 List all connected providers.
 
 ```bash
-infraaudit provider list
+infraudit provider list
 ```
 
 #### `provider connect <aws|gcp|azure>`
@@ -305,18 +305,18 @@ Connect a new cloud provider. Prompts interactively for credentials.
 
 ```bash
 # Connect AWS
-infraaudit provider connect aws
+infraudit provider connect aws
 # > AWS Access Key ID: AKIA...
 # > AWS Secret Access Key: ********
 # > AWS Region [us-east-1]: us-west-2
 
 # Connect GCP
-infraaudit provider connect gcp
+infraudit provider connect gcp
 # > GCP Project ID: my-project
 # > Path to service account JSON: /path/to/key.json
 
 # Connect Azure
-infraaudit provider connect azure
+infraudit provider connect azure
 # > Azure Tenant ID: ...
 # > Azure Client ID: ...
 # > Azure Client Secret: ********
@@ -328,7 +328,7 @@ infraaudit provider connect azure
 Trigger resource sync from a provider.
 
 ```bash
-infraaudit provider sync 1
+infraudit provider sync 1
 # Syncing resources...
 # Sync complete: 47 found, 12 created, 35 updated
 ```
@@ -338,7 +338,7 @@ infraaudit provider sync 1
 Disconnect a provider.
 
 ```bash
-infraaudit provider disconnect 1
+infraudit provider disconnect 1
 ```
 
 #### `provider status`
@@ -346,7 +346,7 @@ infraaudit provider disconnect 1
 Show sync status for all providers.
 
 ```bash
-infraaudit provider status
+infraudit provider status
 ```
 
 ---
@@ -361,16 +361,16 @@ List resources with optional filters.
 
 ```bash
 # List all
-infraaudit resource list
+infraudit resource list
 
 # Filter by provider
-infraaudit resource list --provider 1
+infraudit resource list --provider 1
 
 # Filter by type and region
-infraaudit resource list --type ec2 --region us-east-1
+infraudit resource list --type ec2 --region us-east-1
 
 # JSON output
-infraaudit resource list -o json
+infraudit resource list -o json
 ```
 
 | Flag | Description |
@@ -385,7 +385,7 @@ infraaudit resource list -o json
 Show detailed information about a resource.
 
 ```bash
-infraaudit resource get 42
+infraudit resource get 42
 ```
 
 #### `resource delete <id>`
@@ -393,7 +393,7 @@ infraaudit resource get 42
 Delete a resource.
 
 ```bash
-infraaudit resource delete 42
+infraudit resource delete 42
 ```
 
 ---
@@ -407,9 +407,9 @@ Detect and manage infrastructure configuration drifts.
 List detected drifts with optional filters.
 
 ```bash
-infraaudit drift list
-infraaudit drift list --severity critical
-infraaudit drift list --status detected --type security
+infraudit drift list
+infraudit drift list --severity critical
+infraudit drift list --status detected --type security
 ```
 
 | Flag | Description |
@@ -423,7 +423,7 @@ infraaudit drift list --status detected --type security
 Show drift details.
 
 ```bash
-infraaudit drift get 5
+infraudit drift get 5
 ```
 
 #### `drift detect`
@@ -431,7 +431,7 @@ infraaudit drift get 5
 Trigger a drift detection scan across all resources.
 
 ```bash
-infraaudit drift detect
+infraudit drift detect
 ```
 
 #### `drift summary`
@@ -439,7 +439,7 @@ infraaudit drift detect
 Show an aggregate summary of drift status.
 
 ```bash
-infraaudit drift summary
+infraudit drift summary
 ```
 
 #### `drift resolve <id>`
@@ -447,7 +447,7 @@ infraaudit drift summary
 Mark a drift as resolved.
 
 ```bash
-infraaudit drift resolve 5
+infraudit drift resolve 5
 ```
 
 ---
@@ -461,9 +461,9 @@ Manage security and operational alerts.
 List alerts with optional filters.
 
 ```bash
-infraaudit alert list
-infraaudit alert list --severity high --status open
-infraaudit alert list --type security
+infraudit alert list
+infraudit alert list --severity high --status open
+infraudit alert list --type security
 ```
 
 | Flag | Description |
@@ -477,7 +477,7 @@ infraaudit alert list --type security
 Show alert details.
 
 ```bash
-infraaudit alert get 12
+infraudit alert get 12
 ```
 
 #### `alert summary`
@@ -485,7 +485,7 @@ infraaudit alert get 12
 Show aggregate alert summary.
 
 ```bash
-infraaudit alert summary
+infraudit alert summary
 ```
 
 #### `alert acknowledge <id>`
@@ -493,7 +493,7 @@ infraaudit alert summary
 Acknowledge an alert.
 
 ```bash
-infraaudit alert acknowledge 12
+infraudit alert acknowledge 12
 ```
 
 #### `alert resolve <id>`
@@ -501,7 +501,7 @@ infraaudit alert acknowledge 12
 Resolve an alert.
 
 ```bash
-infraaudit alert resolve 12
+infraudit alert resolve 12
 ```
 
 ---
@@ -515,9 +515,9 @@ Manage vulnerability scanning and results. **Alias:** `vuln`
 List vulnerabilities with optional filters.
 
 ```bash
-infraaudit vuln list
-infraaudit vuln list --severity critical
-infraaudit vuln list --status open
+infraudit vuln list
+infraudit vuln list --severity critical
+infraudit vuln list --status open
 ```
 
 | Flag | Description |
@@ -530,7 +530,7 @@ infraaudit vuln list --status open
 Show vulnerability details.
 
 ```bash
-infraaudit vuln get 7
+infraudit vuln get 7
 ```
 
 #### `vulnerability scan`
@@ -539,10 +539,10 @@ Trigger a vulnerability scan.
 
 ```bash
 # Scan all resources
-infraaudit vuln scan
+infraudit vuln scan
 
 # Scan a specific resource
-infraaudit vuln scan --resource 42
+infraudit vuln scan --resource 42
 ```
 
 | Flag | Description |
@@ -554,7 +554,7 @@ infraaudit vuln scan --resource 42
 Show vulnerability summary statistics.
 
 ```bash
-infraaudit vuln summary
+infraudit vuln summary
 ```
 
 #### `vulnerability top`
@@ -562,7 +562,7 @@ infraaudit vuln summary
 Show the most critical vulnerabilities.
 
 ```bash
-infraaudit vuln top
+infraudit vuln top
 ```
 
 ---
@@ -576,7 +576,7 @@ Cloud cost analytics, forecasting, and optimization.
 Show cost overview across all providers.
 
 ```bash
-infraaudit cost overview
+infraudit cost overview
 ```
 
 #### `cost trends`
@@ -584,8 +584,8 @@ infraaudit cost overview
 Show cost trends over time.
 
 ```bash
-infraaudit cost trends
-infraaudit cost trends --provider aws --period 30d
+infraudit cost trends
+infraudit cost trends --provider aws --period 30d
 ```
 
 | Flag | Description |
@@ -598,8 +598,8 @@ infraaudit cost trends --provider aws --period 30d
 Show cost forecast.
 
 ```bash
-infraaudit cost forecast
-infraaudit cost forecast --provider aws --days 90
+infraudit cost forecast
+infraudit cost forecast --provider aws --days 90
 ```
 
 | Flag | Description |
@@ -612,8 +612,8 @@ infraaudit cost forecast --provider aws --days 90
 Sync cost data from cloud providers.
 
 ```bash
-infraaudit cost sync
-infraaudit cost sync --provider aws
+infraudit cost sync
+infraudit cost sync --provider aws
 ```
 
 | Flag | Description |
@@ -625,7 +625,7 @@ infraaudit cost sync --provider aws
 List detected cost anomalies.
 
 ```bash
-infraaudit cost anomalies
+infraudit cost anomalies
 ```
 
 #### `cost detect-anomalies`
@@ -633,7 +633,7 @@ infraaudit cost anomalies
 Trigger cost anomaly detection.
 
 ```bash
-infraaudit cost detect-anomalies
+infraudit cost detect-anomalies
 ```
 
 #### `cost optimizations`
@@ -641,7 +641,7 @@ infraaudit cost detect-anomalies
 List cost optimization opportunities.
 
 ```bash
-infraaudit cost optimizations
+infraudit cost optimizations
 ```
 
 #### `cost savings`
@@ -649,7 +649,7 @@ infraaudit cost optimizations
 Show potential cost savings.
 
 ```bash
-infraaudit cost savings
+infraudit cost savings
 ```
 
 ---
@@ -663,7 +663,7 @@ Compliance framework management and assessment.
 Show overall compliance posture.
 
 ```bash
-infraaudit compliance overview
+infraudit compliance overview
 ```
 
 #### `compliance frameworks`
@@ -671,7 +671,7 @@ infraaudit compliance overview
 List available compliance frameworks.
 
 ```bash
-infraaudit compliance frameworks
+infraudit compliance frameworks
 ```
 
 #### `compliance framework <id>`
@@ -679,7 +679,7 @@ infraaudit compliance frameworks
 Show details of a specific framework.
 
 ```bash
-infraaudit compliance framework cis-aws
+infraudit compliance framework cis-aws
 ```
 
 #### `compliance enable <id>`
@@ -687,7 +687,7 @@ infraaudit compliance framework cis-aws
 Enable a compliance framework.
 
 ```bash
-infraaudit compliance enable cis-aws
+infraudit compliance enable cis-aws
 ```
 
 #### `compliance disable <id>`
@@ -695,7 +695,7 @@ infraaudit compliance enable cis-aws
 Disable a compliance framework.
 
 ```bash
-infraaudit compliance disable cis-aws
+infraudit compliance disable cis-aws
 ```
 
 #### `compliance assess`
@@ -704,10 +704,10 @@ Run a compliance assessment.
 
 ```bash
 # Assess all enabled frameworks
-infraaudit compliance assess
+infraudit compliance assess
 
 # Assess a specific framework
-infraaudit compliance assess --framework cis-aws
+infraudit compliance assess --framework cis-aws
 ```
 
 | Flag | Description |
@@ -719,7 +719,7 @@ infraaudit compliance assess --framework cis-aws
 List past assessment results.
 
 ```bash
-infraaudit compliance assessments
+infraudit compliance assessments
 ```
 
 #### `compliance export <assessment-id>`
@@ -727,7 +727,7 @@ infraaudit compliance assessments
 Export an assessment report.
 
 ```bash
-infraaudit compliance export 3
+infraudit compliance export 3
 ```
 
 #### `compliance failing-controls`
@@ -735,7 +735,7 @@ infraaudit compliance export 3
 Show currently failing controls.
 
 ```bash
-infraaudit compliance failing-controls
+infraudit compliance failing-controls
 ```
 
 ---
@@ -749,7 +749,7 @@ Kubernetes cluster management and monitoring. **Alias:** `k8s`
 List registered Kubernetes clusters.
 
 ```bash
-infraaudit k8s clusters
+infraudit k8s clusters
 ```
 
 #### `kubernetes register`
@@ -757,7 +757,7 @@ infraaudit k8s clusters
 Register a new Kubernetes cluster.
 
 ```bash
-infraaudit k8s register --name production --kubeconfig ~/.kube/config
+infraudit k8s register --name production --kubeconfig ~/.kube/config
 ```
 
 | Flag | Description |
@@ -770,7 +770,7 @@ infraaudit k8s register --name production --kubeconfig ~/.kube/config
 Delete a registered cluster.
 
 ```bash
-infraaudit k8s delete 1
+infraudit k8s delete 1
 ```
 
 #### `kubernetes sync <id>`
@@ -778,7 +778,7 @@ infraaudit k8s delete 1
 Sync resources from a cluster.
 
 ```bash
-infraaudit k8s sync 1
+infraudit k8s sync 1
 ```
 
 #### `kubernetes namespaces <cluster-id>`
@@ -786,7 +786,7 @@ infraaudit k8s sync 1
 List namespaces in a cluster.
 
 ```bash
-infraaudit k8s namespaces 1
+infraudit k8s namespaces 1
 ```
 
 #### `kubernetes deployments <cluster-id>`
@@ -794,7 +794,7 @@ infraaudit k8s namespaces 1
 List deployments in a cluster.
 
 ```bash
-infraaudit k8s deployments 1
+infraudit k8s deployments 1
 ```
 
 #### `kubernetes pods <cluster-id>`
@@ -802,7 +802,7 @@ infraaudit k8s deployments 1
 List pods in a cluster.
 
 ```bash
-infraaudit k8s pods 1
+infraudit k8s pods 1
 ```
 
 #### `kubernetes services <cluster-id>`
@@ -810,7 +810,7 @@ infraaudit k8s pods 1
 List services in a cluster.
 
 ```bash
-infraaudit k8s services 1
+infraudit k8s services 1
 ```
 
 #### `kubernetes stats`
@@ -818,7 +818,7 @@ infraaudit k8s services 1
 Show aggregate cluster statistics.
 
 ```bash
-infraaudit k8s stats
+infraudit k8s stats
 ```
 
 ---
@@ -832,9 +832,9 @@ Infrastructure as Code management. Supports Terraform, CloudFormation, and Kuber
 Upload an IaC file for analysis.
 
 ```bash
-infraaudit iac upload main.tf
-infraaudit iac upload cloudformation.yaml
-infraaudit iac upload k8s-deployment.yaml
+infraudit iac upload main.tf
+infraudit iac upload cloudformation.yaml
+infraudit iac upload k8s-deployment.yaml
 ```
 
 #### `iac definitions`
@@ -842,7 +842,7 @@ infraaudit iac upload k8s-deployment.yaml
 List uploaded IaC definitions.
 
 ```bash
-infraaudit iac definitions
+infraudit iac definitions
 ```
 
 #### `iac detect-drift`
@@ -850,7 +850,7 @@ infraaudit iac definitions
 Detect drift between IaC definitions and actual infrastructure.
 
 ```bash
-infraaudit iac detect-drift
+infraudit iac detect-drift
 ```
 
 #### `iac drifts`
@@ -858,7 +858,7 @@ infraaudit iac detect-drift
 List detected IaC drifts.
 
 ```bash
-infraaudit iac drifts
+infraudit iac drifts
 ```
 
 #### `iac drift-summary`
@@ -866,7 +866,7 @@ infraaudit iac drifts
 Show IaC drift summary.
 
 ```bash
-infraaudit iac drift-summary
+infraudit iac drift-summary
 ```
 
 ---
@@ -880,7 +880,7 @@ Manage scheduled automation jobs.
 List all scheduled jobs.
 
 ```bash
-infraaudit job list
+infraudit job list
 ```
 
 #### `job create`
@@ -888,7 +888,7 @@ infraaudit job list
 Create a new scheduled job. Prompts interactively if flags are not provided.
 
 ```bash
-infraaudit job create --name "Daily Drift Scan" --type drift_detection --schedule "0 8 * * *"
+infraudit job create --name "Daily Drift Scan" --type drift_detection --schedule "0 8 * * *"
 ```
 
 | Flag | Description |
@@ -902,7 +902,7 @@ infraaudit job create --name "Daily Drift Scan" --type drift_detection --schedul
 Show job details.
 
 ```bash
-infraaudit job get 1
+infraudit job get 1
 ```
 
 #### `job delete <id>`
@@ -910,7 +910,7 @@ infraaudit job get 1
 Delete a job.
 
 ```bash
-infraaudit job delete 1
+infraudit job delete 1
 ```
 
 #### `job run <id>`
@@ -918,7 +918,7 @@ infraaudit job delete 1
 Trigger immediate job execution.
 
 ```bash
-infraaudit job run 1
+infraudit job run 1
 ```
 
 #### `job executions <job-id>`
@@ -926,7 +926,7 @@ infraaudit job run 1
 List execution history for a job.
 
 ```bash
-infraaudit job executions 1
+infraudit job executions 1
 ```
 
 #### `job types`
@@ -934,7 +934,7 @@ infraaudit job executions 1
 List available job types.
 
 ```bash
-infraaudit job types
+infraudit job types
 ```
 
 ---
@@ -948,7 +948,7 @@ Manage automated remediation actions.
 Show remediation summary.
 
 ```bash
-infraaudit remediation summary
+infraudit remediation summary
 ```
 
 #### `remediation pending`
@@ -956,7 +956,7 @@ infraaudit remediation summary
 List pending remediation approvals.
 
 ```bash
-infraaudit remediation pending
+infraudit remediation pending
 ```
 
 #### `remediation suggest-drift <drift-id>`
@@ -964,7 +964,7 @@ infraaudit remediation pending
 Generate AI-powered remediation suggestion for a drift.
 
 ```bash
-infraaudit remediation suggest-drift 5
+infraudit remediation suggest-drift 5
 ```
 
 #### `remediation suggest-vuln <vulnerability-id>`
@@ -972,7 +972,7 @@ infraaudit remediation suggest-drift 5
 Generate AI-powered remediation suggestion for a vulnerability.
 
 ```bash
-infraaudit remediation suggest-vuln 7
+infraudit remediation suggest-vuln 7
 ```
 
 #### `remediation approve <action-id>`
@@ -980,7 +980,7 @@ infraaudit remediation suggest-vuln 7
 Approve a pending remediation action.
 
 ```bash
-infraaudit remediation approve 3
+infraudit remediation approve 3
 ```
 
 #### `remediation execute <action-id>`
@@ -988,7 +988,7 @@ infraaudit remediation approve 3
 Execute an approved remediation action.
 
 ```bash
-infraaudit remediation execute 3
+infraudit remediation execute 3
 ```
 
 #### `remediation rollback <action-id>`
@@ -996,7 +996,7 @@ infraaudit remediation execute 3
 Rollback a previously executed remediation.
 
 ```bash
-infraaudit remediation rollback 3
+infraudit remediation rollback 3
 ```
 
 ---
@@ -1010,9 +1010,9 @@ AI-powered optimization recommendations. **Alias:** `rec`
 List recommendations with optional filters.
 
 ```bash
-infraaudit rec list
-infraaudit rec list --type cost --priority high
-infraaudit rec list --status pending
+infraudit rec list
+infraudit rec list --type cost --priority high
+infraudit rec list --status pending
 ```
 
 | Flag | Description |
@@ -1026,7 +1026,7 @@ infraaudit rec list --status pending
 Show recommendation details.
 
 ```bash
-infraaudit rec get 10
+infraudit rec get 10
 ```
 
 #### `recommendation generate`
@@ -1034,7 +1034,7 @@ infraaudit rec get 10
 Trigger AI recommendation generation.
 
 ```bash
-infraaudit rec generate
+infraudit rec generate
 ```
 
 #### `recommendation savings`
@@ -1042,7 +1042,7 @@ infraaudit rec generate
 Show total potential savings across all recommendations.
 
 ```bash
-infraaudit rec savings
+infraudit rec savings
 ```
 
 #### `recommendation apply <id>`
@@ -1050,7 +1050,7 @@ infraaudit rec savings
 Mark a recommendation as applied.
 
 ```bash
-infraaudit rec apply 10
+infraudit rec apply 10
 ```
 
 #### `recommendation dismiss <id>`
@@ -1058,7 +1058,7 @@ infraaudit rec apply 10
 Dismiss a recommendation.
 
 ```bash
-infraaudit rec dismiss 10
+infraudit rec dismiss 10
 ```
 
 ---
@@ -1072,7 +1072,7 @@ Manage notification preferences and history. **Alias:** `notif`
 Show current notification preferences.
 
 ```bash
-infraaudit notif preferences
+infraudit notif preferences
 ```
 
 #### `notification update <channel>`
@@ -1080,8 +1080,8 @@ infraaudit notif preferences
 Update notification preference for a channel.
 
 ```bash
-infraaudit notif update email --enabled true
-infraaudit notif update slack --enabled false
+infraudit notif update email --enabled true
+infraudit notif update slack --enabled false
 ```
 
 | Flag | Description |
@@ -1093,7 +1093,7 @@ infraaudit notif update slack --enabled false
 Show notification history.
 
 ```bash
-infraaudit notif history
+infraudit notif history
 ```
 
 #### `notification send`
@@ -1101,7 +1101,7 @@ infraaudit notif history
 Send a test notification.
 
 ```bash
-infraaudit notif send --channel email --message "Test notification"
+infraudit notif send --channel email --message "Test notification"
 ```
 
 | Flag | Description |
@@ -1120,7 +1120,7 @@ Manage webhook integrations.
 List configured webhooks.
 
 ```bash
-infraaudit webhook list
+infraudit webhook list
 ```
 
 #### `webhook create`
@@ -1128,7 +1128,7 @@ infraaudit webhook list
 Create a new webhook. Prompts interactively if flags are not provided.
 
 ```bash
-infraaudit webhook create --name "Slack Alerts" --url https://hooks.slack.com/... --events drift.detected,alert.created
+infraudit webhook create --name "Slack Alerts" --url https://hooks.slack.com/... --events drift.detected,alert.created
 ```
 
 | Flag | Description |
@@ -1143,7 +1143,7 @@ infraaudit webhook create --name "Slack Alerts" --url https://hooks.slack.com/..
 Show webhook details.
 
 ```bash
-infraaudit webhook get 1
+infraudit webhook get 1
 ```
 
 #### `webhook delete <id>`
@@ -1151,7 +1151,7 @@ infraaudit webhook get 1
 Delete a webhook.
 
 ```bash
-infraaudit webhook delete 1
+infraudit webhook delete 1
 ```
 
 #### `webhook test <id>`
@@ -1159,7 +1159,7 @@ infraaudit webhook delete 1
 Send a test event to a webhook.
 
 ```bash
-infraaudit webhook test 1
+infraudit webhook test 1
 ```
 
 #### `webhook events`
@@ -1167,7 +1167,7 @@ infraaudit webhook test 1
 List all available webhook event types.
 
 ```bash
-infraaudit webhook events
+infraudit webhook events
 ```
 
 ---
@@ -1180,35 +1180,35 @@ Generate shell completion scripts for tab-completion support.
 
 ```bash
 # Current session
-source <(infraaudit completion bash)
+source <(infraudit completion bash)
 
 # Permanent (add to ~/.bashrc)
-infraaudit completion bash > /etc/bash_completion.d/infraaudit
+infraudit completion bash > /etc/bash_completion.d/infraudit
 ```
 
 ### Zsh
 
 ```bash
 # Current session
-source <(infraaudit completion zsh)
+source <(infraudit completion zsh)
 
 # Permanent (add to ~/.zshrc)
-infraaudit completion zsh > "${fpath[1]}/_infraaudit"
+infraudit completion zsh > "${fpath[1]}/_infraudit"
 ```
 
 ### Fish
 
 ```bash
-infraaudit completion fish | source
+infraudit completion fish | source
 
 # Permanent
-infraaudit completion fish > ~/.config/fish/completions/infraaudit.fish
+infraudit completion fish > ~/.config/fish/completions/infraudit.fish
 ```
 
 ### PowerShell
 
 ```powershell
-infraaudit completion powershell | Out-String | Invoke-Expression
+infraudit completion powershell | Out-String | Invoke-Expression
 ```
 
 ---
@@ -1217,8 +1217,8 @@ infraaudit completion powershell | Out-String | Invoke-Expression
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `INFRAAUDIT_SERVER_URL` | Server URL | `http://localhost:8080` |
-| `INFRAAUDIT_OUTPUT` | Default output format | `table` |
+| `INFRAUDIT_SERVER_URL` | Server URL | `http://localhost:8080` |
+| `INFRAUDIT_OUTPUT` | Default output format | `table` |
 
 Environment variables override config file values. CLI flags override both.
 
@@ -1232,70 +1232,70 @@ Environment variables override config file values. CLI flags override both.
 
 ```bash
 # Setup
-infraaudit config init
-infraaudit auth login
+infraudit config init
+infraudit auth login
 
 # Connect AWS
-infraaudit provider connect aws
-infraaudit provider sync 1
+infraudit provider connect aws
+infraudit provider sync 1
 
 # Security scan
-infraaudit drift detect
-infraaudit vuln scan
+infraudit drift detect
+infraudit vuln scan
 
 # Review findings
-infraaudit drift list --severity critical
-infraaudit vuln top
-infraaudit alert list --severity high
+infraudit drift list --severity critical
+infraudit vuln top
+infraudit alert list --severity high
 
 # Remediate
-infraaudit remediation suggest-drift 1
-infraaudit remediation approve 1
-infraaudit remediation execute 1
+infraudit remediation suggest-drift 1
+infraudit remediation approve 1
+infraudit remediation execute 1
 
 # Verify
-infraaudit drift list --status resolved
-infraaudit status
+infraudit drift list --status resolved
+infraudit status
 ```
 
 ### Cost Optimization Workflow
 
 ```bash
 # Sync cost data
-infraaudit cost sync
+infraudit cost sync
 
 # Analyze
-infraaudit cost overview
-infraaudit cost trends --period 30d
-infraaudit cost anomalies
-infraaudit cost forecast --days 90
+infraudit cost overview
+infraudit cost trends --period 30d
+infraudit cost anomalies
+infraudit cost forecast --days 90
 
 # Get recommendations
-infraaudit rec generate
-infraaudit rec list --type cost
-infraaudit rec savings
+infraudit rec generate
+infraudit rec list --type cost
+infraudit rec savings
 
 # Apply recommendation
-infraaudit rec apply 10
+infraudit rec apply 10
 ```
 
 ### Compliance Assessment
 
 ```bash
 # Enable framework
-infraaudit compliance frameworks
-infraaudit compliance enable cis-aws
+infraudit compliance frameworks
+infraudit compliance enable cis-aws
 
 # Run assessment
-infraaudit compliance assess --framework cis-aws
+infraudit compliance assess --framework cis-aws
 
 # Review results
-infraaudit compliance overview
-infraaudit compliance failing-controls
+infraudit compliance overview
+infraudit compliance failing-controls
 
 # Export report
-infraaudit compliance assessments
-infraaudit compliance export 1
+infraudit compliance assessments
+infraudit compliance export 1
 ```
 
 ### CI/CD Integration
@@ -1304,20 +1304,20 @@ infraaudit compliance export 1
 #!/bin/bash
 # ci-security-check.sh
 
-export INFRAAUDIT_SERVER_URL=https://api.infraaudit.dev
+export INFRAUDIT_SERVER_URL=https://api.infraudit.dev
 
 # Login with pre-stored credentials
-infraaudit auth login --email "$CI_EMAIL" --password "$CI_PASSWORD"
+infraudit auth login --email "$CI_EMAIL" --password "$CI_PASSWORD"
 
 # Run scans
-infraaudit drift detect
-infraaudit vuln scan
+infraudit drift detect
+infraudit vuln scan
 
 # Check for critical findings (JSON output for parsing)
-CRITICAL=$(infraaudit drift list --severity critical -o json | jq 'length')
+CRITICAL=$(infraudit drift list --severity critical -o json | jq 'length')
 if [ "$CRITICAL" -gt 0 ]; then
   echo "FAIL: $CRITICAL critical drifts detected"
-  infraaudit drift list --severity critical
+  infraudit drift list --severity critical
   exit 1
 fi
 
@@ -1328,14 +1328,14 @@ echo "PASS: No critical drifts"
 
 ```bash
 # Get all resource IDs as a list
-infraaudit resource list -o json | jq '.[].id'
+infraudit resource list -o json | jq '.[].id'
 
 # Count resources by type
-infraaudit resource list -o json | jq 'group_by(.resource_type) | map({type: .[0].resource_type, count: length})'
+infraudit resource list -o json | jq 'group_by(.resource_type) | map({type: .[0].resource_type, count: length})'
 
 # Get total estimated savings
-infraaudit rec list -o json | jq '[.[].estimated_savings] | add'
+infraudit rec list -o json | jq '[.[].estimated_savings] | add'
 
 # Export drift details to CSV
-infraaudit drift list -o json | jq -r '.[] | [.id, .drift_type, .severity, .status] | @csv'
+infraudit drift list -o json | jq -r '.[] | [.id, .drift_type, .severity, .status] | @csv'
 ```
