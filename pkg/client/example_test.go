@@ -12,7 +12,7 @@ import (
 func Example() {
 	// Create a new client
 	c := client.NewClient(client.Config{
-		BaseURL: "https://api.infraaudit.com",
+		BaseURL: "https://api.infraudit.com",
 	})
 
 	ctx := context.Background()
@@ -37,7 +37,7 @@ func Example() {
 // ExampleClient_Login demonstrates user authentication
 func ExampleClient_Login() {
 	c := client.NewClient(client.Config{
-		BaseURL: "https://api.infraaudit.com",
+		BaseURL: "https://api.infraudit.com",
 	})
 
 	loginResp, err := c.Login(context.Background(), "user@example.com", "password")
@@ -51,7 +51,7 @@ func ExampleClient_Login() {
 // ExampleResourceService_List demonstrates listing resources with filters
 func ExampleResourceService_List() {
 	c := client.NewClient(client.Config{
-		BaseURL: "https://api.infraaudit.com",
+		BaseURL: "https://api.infraudit.com",
 	})
 
 	// Login first
@@ -86,7 +86,7 @@ func ExampleResourceService_List() {
 // ExampleProviderService_Create demonstrates creating a cloud provider connection
 func ExampleProviderService_Create() {
 	c := client.NewClient(client.Config{
-		BaseURL: "https://api.infraaudit.com",
+		BaseURL: "https://api.infraudit.com",
 	})
 
 	// Login first
@@ -115,7 +115,7 @@ func ExampleProviderService_Create() {
 // ExampleProviderService_Sync demonstrates syncing resources from a provider
 func ExampleProviderService_Sync() {
 	c := client.NewClient(client.Config{
-		BaseURL: "https://api.infraaudit.com",
+		BaseURL: "https://api.infraudit.com",
 	})
 
 	// Login first
@@ -140,7 +140,7 @@ func ExampleProviderService_Sync() {
 // ExampleAlertService_List demonstrates listing critical alerts
 func ExampleAlertService_List() {
 	c := client.NewClient(client.Config{
-		BaseURL: "https://api.infraaudit.com",
+		BaseURL: "https://api.infraudit.com",
 	})
 
 	// Login first
@@ -170,7 +170,7 @@ func ExampleAlertService_List() {
 // ExampleRecommendationService_List demonstrates listing cost recommendations
 func ExampleRecommendationService_List() {
 	c := client.NewClient(client.Config{
-		BaseURL: "https://api.infraaudit.com",
+		BaseURL: "https://api.infraudit.com",
 	})
 
 	// Login first
@@ -202,7 +202,7 @@ func ExampleRecommendationService_List() {
 // ExampleClient_Health demonstrates checking API health
 func ExampleClient_Health() {
 	c := client.NewClient(client.Config{
-		BaseURL: "https://api.infraaudit.com",
+		BaseURL: "https://api.infraudit.com",
 	})
 
 	health, err := c.Health(context.Background())
@@ -217,7 +217,7 @@ func ExampleClient_Health() {
 // ExampleClient_apiKey demonstrates using API key authentication
 func ExampleClient_apiKey() {
 	c := client.NewClient(client.Config{
-		BaseURL: "https://api.infraaudit.com",
+		BaseURL: "https://api.infraudit.com",
 		APIKey:  "your-api-key",
 	})
 

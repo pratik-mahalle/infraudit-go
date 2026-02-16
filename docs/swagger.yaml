@@ -626,7 +626,7 @@ definitions:
 host: localhost:8080
 info:
   contact:
-    email: support@infraaudit.com
+    email: support@infraudit.com
     name: API Support
   description: |-
     Cloud Infrastructure Auditing and Security Platform API

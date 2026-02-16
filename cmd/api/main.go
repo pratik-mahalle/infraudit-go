@@ -33,7 +33,7 @@ import (
 // @termsOfService http://swagger.io/terms/
 
 // @contact.name API Support
-// @contact.email support@infraaudit.com
+// @contact.email support@infraudit.com
 
 // @license.name MIT
 // @license.url https://opensource.org/licenses/MIT
@@ -94,7 +94,7 @@ func main() {
 	log.WithFields(map[string]interface{}{
 		"environment": cfg.Server.Environment,
 		"port":        cfg.Server.Port,
-	}).Info("Starting infraaudit API server")
+	}).Info("Starting infraudit API server")
 
 	// Connect to database
 	db, err := postgres.New(cfg.Database)

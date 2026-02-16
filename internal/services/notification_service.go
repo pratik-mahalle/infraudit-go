@@ -243,7 +243,7 @@ func (s *NotificationService) buildSlackMessage(n *notification.Notification) ma
 				"title":       fmt.Sprintf("%s %s", emoji, n.Title),
 				"text":        n.Message,
 				"footer":      "InfraAudit",
-				"footer_icon": "https://example.com/infraaudit-icon.png",
+				"footer_icon": "https://example.com/infraudit-icon.png",
 				"ts":          time.Now().Unix(),
 			},
 		},

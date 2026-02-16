@@ -1380,7 +1380,7 @@ GITLAB_TOKEN=<gitlab_personal_access_token>
 # Notification Channels
 SLACK_WEBHOOK_URL=<slack_webhook_url>
 SENDGRID_API_KEY=<sendgrid_api_key>
-EMAIL_FROM=noreply@infraaudit.com
+EMAIL_FROM=noreply@infraudit.com
 
 # Job Scheduler
 ENABLE_SCHEDULER=true
@@ -1398,14 +1398,14 @@ RUN wget -O /usr/local/bin/tfsec https://github.com/aquasecurity/tfsec/releases/
 # Build Go application
 COPY . /app
 WORKDIR /app
-RUN go build -o /bin/infraaudit ./cmd/api
+RUN go build -o /bin/infraudit ./cmd/api
 
 FROM alpine:latest
 RUN apk add --no-cache ca-certificates python3 py3-pip git
 COPY --from=builder /usr/local/bin/checkov /usr/local/bin/checkov
 COPY --from=builder /usr/local/bin/tfsec /usr/local/bin/tfsec
-COPY --from=builder /bin/infraaudit /bin/infraaudit
-ENTRYPOINT ["/bin/infraaudit"]
+COPY --from=builder /bin/infraudit /bin/infraudit
+ENTRYPOINT ["/bin/infraudit"]
 ```
 
 ---

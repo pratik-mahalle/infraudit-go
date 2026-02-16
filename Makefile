@@ -1,7 +1,7 @@
 APP=api
 PKG=./...
 BIN=bin/$(APP)
-DOCKER_IMAGE=infraaudit-go
+DOCKER_IMAGE=infraudit-go
 
 .PHONY: build build-cli install-cli run clean docker-build docker-run deps fmt lint swagger swagger-install
 
@@ -9,7 +9,7 @@ build:
 	GO111MODULE=on CGO_ENABLED=0 go build -o $(BIN) ./cmd/api
 
 build-cli:
-	GO111MODULE=on CGO_ENABLED=0 go build -o bin/infraaudit ./cmd/cli
+	GO111MODULE=on CGO_ENABLED=0 go build -o bin/infraudit ./cmd/cli
 
 install-cli:
 	go install ./cmd/cli

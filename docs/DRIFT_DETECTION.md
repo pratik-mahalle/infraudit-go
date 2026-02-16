@@ -251,7 +251,7 @@ Authorization: Bearer <token>
 
 ```bash
 # Run migration to create baselines table
-sqlite3 infraaudit.db < migrations/002_add_baselines_and_config.sql
+sqlite3 infraudit.db < migrations/002_add_baselines_and_config.sql
 
 # Scan cloud resources (captures configuration)
 POST /api/v1/providers/aws/sync
@@ -445,13 +445,13 @@ To test the implementation:
 
 1. **Run migration:**
    ```bash
-   sqlite3 infraaudit.db < migrations/002_add_baselines_and_config.sql
+   sqlite3 infraudit.db < migrations/002_add_baselines_and_config.sql
    ```
 
 2. **Build and run:**
    ```bash
-   go build -o infraaudit cmd/api/main.go
-   ./infraaudit
+   go build -o infraudit cmd/api/main.go
+   ./infraudit
    ```
 
 3. **Test API endpoints:**
