@@ -3,9 +3,8 @@ package cli
 import (
 	"context"
 	"fmt"
-	"strconv"
+	"time"
 
-	"github.com/pratik-mahalle/infraudit/pkg/client"
 	"github.com/spf13/cobra"
 )
 
@@ -30,8 +29,14 @@ func newProviderListCmd() *cobra.Command {
 		Short: "List connected providers",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := context.Background()
-			providers, err := apiClient.Providers().List(ctx, nil)
-			if err != nil {
+			
+			// Use DoRaw to match the API response structure
+			var providers []struct {
+				Provider    string     `json:"provider"`
+				IsConnected bool       `json:"is_connected"`
+				LastSynced  *time.Time `json:"last_synced,omitempty"`
+			}
+			if err := apiClient.DoRaw(ctx, "GET", "/api/providers", nil, &providers); err != nil {
 				return fmt.Errorf("failed to list providers: %w", err)
 			}
 
@@ -40,17 +45,19 @@ func newProviderListCmd() *cobra.Command {
 				return printOutput(providers)
 			}
 
-			t := NewTable("ID", "NAME", "TYPE", "STATUS", "LAST SYNCED")
+			t := NewTable("PROVIDER", "STATUS", "LAST SYNCED")
 			for _, p := range providers {
+				status := "disconnected"
+				if p.IsConnected {
+					status = "connected"
+				}
 				lastSync := "never"
-				if p.LastSyncedAt != nil {
-					lastSync = p.LastSyncedAt.Format("2006-01-02 15:04")
+				if p.LastSynced != nil {
+					lastSync = p.LastSynced.Format("2006-01-02 15:04")
 				}
 				t.AddRow(
-					strconv.FormatInt(p.ID, 10),
-					p.Name,
-					p.ProviderType,
-					formatStatus(p.Status),
+					p.Provider,
+					status,
 					lastSync,
 				)
 			}
@@ -67,48 +74,55 @@ func newProviderConnectCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			providerType := args[0]
-			credentials := map[string]interface{}{}
+			
+			// Build the request body matching the ConnectProviderRequest DTO
+			req := map[string]interface{}{
+				"provider": providerType,
+			}
 
 			switch providerType {
 			case "aws":
-				credentials["access_key_id"] = promptInput("AWS Access Key ID: ")
+				accessKeyID := promptInput("AWS Access Key ID: ")
 				secretKey, err := promptPassword("AWS Secret Access Key: ")
 				if err != nil {
 					return err
 				}
-				credentials["secret_access_key"] = secretKey
 				region := promptInput("AWS Region [us-east-1]: ")
 				if region == "" {
 					region = "us-east-1"
 				}
-				credentials["region"] = region
+				req["aws_access_key_id"] = accessKeyID
+				req["aws_secret_access_key"] = secretKey
+				req["aws_region"] = region
 			case "gcp":
-				credentials["project_id"] = promptInput("GCP Project ID: ")
-				credentials["service_account_json"] = promptInput("Path to service account JSON: ")
+				projectID := promptInput("GCP Project ID: ")
+				serviceAccountJSON := promptInput("Path to service account JSON: ")
+				req["gcp_project_id"] = projectID
+				req["gcp_service_account_json"] = serviceAccountJSON
 			case "azure":
-				credentials["tenant_id"] = promptInput("Azure Tenant ID: ")
-				credentials["client_id"] = promptInput("Azure Client ID: ")
+				tenantID := promptInput("Azure Tenant ID: ")
+				clientID := promptInput("Azure Client ID: ")
 				clientSecret, err := promptPassword("Azure Client Secret: ")
 				if err != nil {
 					return err
 				}
-				credentials["client_secret"] = clientSecret
-				credentials["subscription_id"] = promptInput("Azure Subscription ID: ")
+				subscriptionID := promptInput("Azure Subscription ID: ")
+				req["azure_tenant_id"] = tenantID
+				req["azure_client_id"] = clientID
+				req["azure_client_secret"] = clientSecret
+				req["azure_subscription_id"] = subscriptionID
 			default:
 				return fmt.Errorf("unsupported provider type: %s (use aws, gcp, or azure)", providerType)
 			}
 
 			ctx := context.Background()
-			provider, err := apiClient.Providers().Create(ctx, client.CreateProviderRequest{
-				Name:         providerType + "-account",
-				ProviderType: providerType,
-				Credentials:  credentials,
-			})
-			if err != nil {
+			var result map[string]interface{}
+			path := fmt.Sprintf("/api/providers/%s/connect", providerType)
+			if err := apiClient.DoRaw(ctx, "POST", path, req, &result); err != nil {
 				return fmt.Errorf("failed to connect provider: %w", err)
 			}
 
-			fmt.Printf("Connected to %s successfully (ID: %d)\n", providerType, provider.ID)
+			fmt.Printf("Connected to %s successfully\n", providerType)
 			return nil
 		},
 	}
@@ -117,30 +131,27 @@ func newProviderConnectCmd() *cobra.Command {
 
 func newProviderSyncCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "sync <provider-id>",
+		Use:   "sync <aws|gcp|azure>",
 		Short: "Sync resources from a provider",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			id, err := strconv.ParseInt(args[0], 10, 64)
-			if err != nil {
-				return fmt.Errorf("invalid provider ID: %s", args[0])
+			providerType := args[0]
+			
+			// Validate provider type
+			if providerType != "aws" && providerType != "gcp" && providerType != "azure" {
+				return fmt.Errorf("invalid provider type: %s (use aws, gcp, or azure)", providerType)
 			}
 
 			ctx := context.Background()
-			fmt.Println("Syncing resources...")
-			result, err := apiClient.Providers().Sync(ctx, id)
-			if err != nil {
+			fmt.Printf("Syncing %s resources...\n", providerType)
+			
+			var result map[string]interface{}
+			path := fmt.Sprintf("/api/providers/%s/sync", providerType)
+			if err := apiClient.DoRaw(ctx, "POST", path, nil, &result); err != nil {
 				return fmt.Errorf("sync failed: %w", err)
 			}
-
-			fmt.Printf("Sync complete: %d found, %d created, %d updated\n",
-				result.ResourcesFound, result.ResourcesCreated, result.ResourcesUpdated)
-			if len(result.Errors) > 0 {
-				fmt.Printf("Errors: %d\n", len(result.Errors))
-				for _, e := range result.Errors {
-					fmt.Printf("  - %s\n", e)
-				}
-			}
+			
+			fmt.Printf("Sync initiated for %s\n", providerType)
 			return nil
 		},
 	}
@@ -148,17 +159,20 @@ func newProviderSyncCmd() *cobra.Command {
 
 func newProviderDisconnectCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "disconnect <provider-id>",
+		Use:   "disconnect <aws|gcp|azure>",
 		Short: "Disconnect a provider",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			id, err := strconv.ParseInt(args[0], 10, 64)
-			if err != nil {
-				return fmt.Errorf("invalid provider ID: %s", args[0])
+			providerType := args[0]
+			
+			// Validate provider type
+			if providerType != "aws" && providerType != "gcp" && providerType != "azure" {
+				return fmt.Errorf("invalid provider type: %s (use aws, gcp, or azure)", providerType)
 			}
 
 			ctx := context.Background()
-			if err := apiClient.Providers().Delete(ctx, id); err != nil {
+			path := fmt.Sprintf("/api/providers/%s", providerType)
+			if err := apiClient.DoRaw(ctx, "DELETE", path, nil, nil); err != nil {
 				return fmt.Errorf("failed to disconnect provider: %w", err)
 			}
 
@@ -174,8 +188,13 @@ func newProviderStatusCmd() *cobra.Command {
 		Short: "Show provider sync status",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := context.Background()
-			providers, err := apiClient.Providers().List(ctx, nil)
-			if err != nil {
+			
+			var providers []struct {
+				Provider    string     `json:"provider"`
+				IsConnected bool       `json:"is_connected"`
+				LastSynced  *time.Time `json:"last_synced,omitempty"`
+			}
+			if err := apiClient.DoRaw(ctx, "GET", "/api/providers", nil, &providers); err != nil {
 				return fmt.Errorf("failed to get provider status: %w", err)
 			}
 
@@ -184,16 +203,19 @@ func newProviderStatusCmd() *cobra.Command {
 				return printOutput(providers)
 			}
 
-			t := NewTable("ID", "TYPE", "STATUS", "LAST SYNCED")
+			t := NewTable("PROVIDER", "STATUS", "LAST SYNCED")
 			for _, p := range providers {
+				status := "disconnected"
+				if p.IsConnected {
+					status = "connected"
+				}
 				lastSync := "never"
-				if p.LastSyncedAt != nil {
-					lastSync = p.LastSyncedAt.Format("2006-01-02 15:04:05")
+				if p.LastSynced != nil {
+					lastSync = p.LastSynced.Format("2006-01-02 15:04:05")
 				}
 				t.AddRow(
-					strconv.FormatInt(p.ID, 10),
-					p.ProviderType,
-					formatStatus(p.Status),
+					p.Provider,
+					status,
 					lastSync,
 				)
 			}
