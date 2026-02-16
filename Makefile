@@ -3,10 +3,16 @@ PKG=./...
 BIN=bin/$(APP)
 DOCKER_IMAGE=infraaudit-go
 
-.PHONY: build run clean docker-build docker-run deps fmt lint swagger swagger-install
+.PHONY: build build-cli install-cli run clean docker-build docker-run deps fmt lint swagger swagger-install
 
 build:
 	GO111MODULE=on CGO_ENABLED=0 go build -o $(BIN) ./cmd/api
+
+build-cli:
+	GO111MODULE=on CGO_ENABLED=0 go build -o bin/infraaudit ./cmd/cli
+
+install-cli:
+	go install ./cmd/cli
 
 build-settings:
 	GO111MODULE=on CGO_ENABLED=0 go build -o bin/settings ./settings
