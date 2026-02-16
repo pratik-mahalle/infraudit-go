@@ -256,6 +256,7 @@ Return ONLY a JSON array of recommendations. Be specific with savings estimates.
 
 // analyzeCostOptimizationBatchRuleBased generates cost recommendations using heuristics
 func (e *RecommendationEngine) analyzeCostOptimizationBatchRuleBased(ctx context.Context, userID int64, resources []*resource.Resource) error {
+	var errs []error
 	for _, res := range resources {
 		// Check for stopped/inactive resources
 		if res.Status == "stopped" || res.Status == "inactive" || res.Status == "terminated" {
@@ -273,6 +274,7 @@ func (e *RecommendationEngine) analyzeCostOptimizationBatchRuleBased(ctx context
 			}
 			if _, err := e.recRepo.Create(ctx, rec); err != nil {
 				e.logger.ErrorWithErr(err, "Failed to save cost recommendation")
+				errs = append(errs, fmt.Errorf("failed to save cost recommendation for %s: %w", res.ResourceID, err))
 			}
 			continue
 		}
@@ -293,8 +295,13 @@ func (e *RecommendationEngine) analyzeCostOptimizationBatchRuleBased(ctx context
 			}
 			if _, err := e.recRepo.Create(ctx, rec); err != nil {
 				e.logger.ErrorWithErr(err, "Failed to save cost recommendation")
+				errs = append(errs, fmt.Errorf("failed to save cost recommendation for %s: %w", res.ResourceID, err))
 			}
 		}
+	}
+	
+	if len(errs) > 0 {
+		return fmt.Errorf("encountered %d errors while creating cost recommendations: %v", len(errs), errs[0])
 	}
 	return nil
 }
@@ -326,6 +333,7 @@ func (e *RecommendationEngine) generateSecurityRecommendations(ctx context.Conte
 
 		// Rule-based fallback when Gemini is not available
 		if e.geminiClient == nil {
+			var errs []error
 			for _, v := range vulns {
 				priority := recommendation.PriorityMedium
 				if v.Severity == "critical" {
@@ -357,7 +365,11 @@ func (e *RecommendationEngine) generateSecurityRecommendations(ctx context.Conte
 				}
 				if _, err := e.recRepo.Create(ctx, rec); err != nil {
 					e.logger.ErrorWithErr(err, "Failed to save security recommendation")
+					errs = append(errs, fmt.Errorf("failed to save security recommendation for %s: %w", v.ResourceID, err))
 				}
+			}
+			if len(errs) > 0 {
+				return fmt.Errorf("encountered %d errors while creating security recommendations: %v", len(errs), errs[0])
 			}
 		} else {
 			// AI-powered analysis
@@ -551,6 +563,7 @@ func (e *RecommendationEngine) generateComplianceRecommendations(ctx context.Con
 
 		// Rule-based fallback when Gemini is not available
 		if e.geminiClient == nil {
+			var errs []error
 			for _, d := range drifts {
 				priority := recommendation.PriorityMedium
 				if d.Severity == "critical" {
@@ -573,7 +586,11 @@ func (e *RecommendationEngine) generateComplianceRecommendations(ctx context.Con
 				}
 				if _, err := e.recRepo.Create(ctx, rec); err != nil {
 					e.logger.ErrorWithErr(err, "Failed to save compliance recommendation")
+					errs = append(errs, fmt.Errorf("failed to save compliance recommendation for %s: %w", d.ResourceID, err))
 				}
+			}
+			if len(errs) > 0 {
+				return fmt.Errorf("encountered %d errors while creating compliance recommendations: %v", len(errs), errs[0])
 			}
 		} else {
 			// AI-powered analysis in batches
