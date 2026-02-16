@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"net/url"
 
 	"github.com/spf13/cobra"
 )
@@ -200,17 +201,16 @@ func newCostSavingsCmd() *cobra.Command {
 	}
 }
 
-// buildQueryParams builds a URL query string from a map, skipping empty values.
+// buildQueryParams builds a URL query string from a map using proper URL encoding
 func buildQueryParams(params map[string]string) string {
-	result := ""
+	query := url.Values{}
 	for k, v := range params {
-		if v == "" {
-			continue
+		if v != "" {
+			query.Set(k, v)
 		}
-		if result != "" {
-			result += "&"
-		}
-		result += k + "=" + v
 	}
-	return result
+	if len(query) == 0 {
+		return ""
+	}
+	return query.Encode()
 }

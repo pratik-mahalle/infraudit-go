@@ -3,9 +3,9 @@ package cli
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"strconv"
 
-	"github.com/pratik-mahalle/infraudit/pkg/client"
 	"github.com/spf13/cobra"
 )
 
@@ -33,29 +33,50 @@ func newAlertListCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := context.Background()
 
-			opts := &client.AlertListOptions{}
+			// Build query parameters with proper URL encoding
+			query := url.Values{}
 			if severity != "" {
-				opts.Severity = &severity
+				query.Set("severity", severity)
 			}
 			if status != "" {
-				opts.Status = &status
+				query.Set("status", status)
 			}
 			if alertType != "" {
-				opts.Type = &alertType
+				query.Set("type", alertType)
 			}
 
-			alerts, err := apiClient.Alerts().List(ctx, opts)
-			if err != nil {
+			path := "/api/alerts"
+			if len(query) > 0 {
+				path += "?" + query.Encode()
+			}
+
+			// Parse paginated response
+			var response struct {
+				Data []struct {
+					ID          int64  `json:"id"`
+					Type        string `json:"type"`
+					Severity    string `json:"severity"`
+					Title       string `json:"title"`
+					Description string `json:"description"`
+					Resource    string `json:"resource"`
+					Status      string `json:"status"`
+				} `json:"data"`
+				Page     int `json:"page"`
+				PageSize int `json:"pageSize"`
+				Total    int `json:"total"`
+			}
+			
+			if err := apiClient.DoRaw(ctx, "GET", path, nil, &response); err != nil {
 				return fmt.Errorf("failed to list alerts: %w", err)
 			}
 
 			format := getOutputFormat()
 			if format != "table" {
-				return printOutput(alerts)
+				return printOutput(response.Data)
 			}
 
 			t := NewTable("ID", "TYPE", "SEVERITY", "STATUS", "TITLE")
-			for _, a := range alerts {
+			for _, a := range response.Data {
 				t.AddRow(
 					strconv.FormatInt(a.ID, 10),
 					a.Type,
@@ -65,6 +86,7 @@ func newAlertListCmd() *cobra.Command {
 				)
 			}
 			t.Render()
+			fmt.Printf("\nShowing %d of %d alerts\n", len(response.Data), response.Total)
 			return nil
 		},
 	}
