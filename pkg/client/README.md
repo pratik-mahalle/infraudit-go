@@ -24,7 +24,7 @@ import (
 func main() {
     // Create a new client
     c := client.NewClient(client.Config{
-        BaseURL: "https://api.infraaudit.com",
+        BaseURL: "https://api.infraudit.com",
     })
 
     // Login
@@ -65,7 +65,7 @@ func main() {
 
 ```go
 c := client.NewClient(client.Config{
-    BaseURL: "https://api.infraaudit.com",
+    BaseURL: "https://api.infraudit.com",
 })
 
 loginResp, err := c.Login(context.Background(), "user@example.com", "password")
@@ -106,7 +106,7 @@ fmt.Printf("User: %s (%s)\n", user.Username, user.Email)
 
 ```go
 c := client.NewClient(client.Config{
-    BaseURL: "https://api.infraaudit.com",
+    BaseURL: "https://api.infraudit.com",
     APIKey:  "your-api-key",
 })
 
@@ -422,7 +422,7 @@ httpClient := &http.Client{
 }
 
 c := client.NewClient(client.Config{
-    BaseURL:    "https://api.infraaudit.com",
+    BaseURL:    "https://api.infraudit.com",
     HTTPClient: httpClient,
 })
 ```
@@ -431,7 +431,7 @@ c := client.NewClient(client.Config{
 
 ```go
 c := client.NewClient(client.Config{
-    BaseURL: "https://api.infraaudit.com",
+    BaseURL: "https://api.infraudit.com",
     Timeout: 60 * time.Second,
 })
 ```
@@ -440,7 +440,7 @@ c := client.NewClient(client.Config{
 
 ```go
 c := client.NewClient(client.Config{
-    BaseURL: "https://api.infraaudit.com",
+    BaseURL: "https://api.infraudit.com",
 })
 
 // Set token manually
