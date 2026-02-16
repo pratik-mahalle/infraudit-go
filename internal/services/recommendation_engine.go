@@ -301,7 +301,7 @@ func (e *RecommendationEngine) analyzeCostOptimizationBatchRuleBased(ctx context
 	}
 	
 	if len(errs) > 0 {
-		return fmt.Errorf("encountered %d errors while creating cost recommendations: %v", len(errs), errs[0])
+		return fmt.Errorf("encountered %d errors while creating cost recommendations (first error: %v)", len(errs), errs[0])
 	}
 	return nil
 }
@@ -369,7 +369,7 @@ func (e *RecommendationEngine) generateSecurityRecommendations(ctx context.Conte
 				}
 			}
 			if len(errs) > 0 {
-				return fmt.Errorf("encountered %d errors while creating security recommendations: %v", len(errs), errs[0])
+				return fmt.Errorf("encountered %d errors while creating security recommendations (first error: %v)", len(errs), errs[0])
 			}
 		} else {
 			// AI-powered analysis
@@ -590,7 +590,7 @@ func (e *RecommendationEngine) generateComplianceRecommendations(ctx context.Con
 				}
 			}
 			if len(errs) > 0 {
-				return fmt.Errorf("encountered %d errors while creating compliance recommendations: %v", len(errs), errs[0])
+				return fmt.Errorf("encountered %d errors while creating compliance recommendations (first error: %v)", len(errs), errs[0])
 			}
 		} else {
 			// AI-powered analysis in batches

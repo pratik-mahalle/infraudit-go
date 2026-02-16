@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"net/url"
 
 	"github.com/spf13/cobra"
 )
@@ -29,27 +30,24 @@ func newResourceListCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := context.Background()
 
-			// Build query parameters
-			path := "/api/resources?"
-			params := []string{}
+			// Build query parameters with proper URL encoding
+			query := url.Values{}
 			if provider != "" {
-				params = append(params, "provider="+provider)
+				query.Set("provider", provider)
 			}
 			if resourceType != "" {
-				params = append(params, "type="+resourceType)
+				query.Set("type", resourceType)
 			}
 			if region != "" {
-				params = append(params, "region="+region)
+				query.Set("region", region)
 			}
 			if status != "" {
-				params = append(params, "status="+status)
+				query.Set("status", status)
 			}
 			
-			for i, p := range params {
-				if i > 0 {
-					path += "&"
-				}
-				path += p
+			path := "/api/resources"
+			if len(query) > 0 {
+				path += "?" + query.Encode()
 			}
 
 			// Use DoRaw to get paginated response
