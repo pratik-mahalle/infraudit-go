@@ -3,9 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
-	"strconv"
 
-	"github.com/pratik-mahalle/infraudit/pkg/client"
 	"github.com/spf13/cobra"
 )
 
@@ -31,51 +29,74 @@ func newResourceListCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := context.Background()
 
-			opts := &client.ResourceListOptions{}
+			// Build query parameters
+			path := "/api/resources?"
+			params := []string{}
 			if provider != "" {
-				id, err := strconv.ParseInt(provider, 10, 64)
-				if err != nil {
-					return fmt.Errorf("invalid provider ID: %s", provider)
-				}
-				opts.ProviderID = &id
+				params = append(params, "provider="+provider)
 			}
 			if resourceType != "" {
-				opts.ResourceType = &resourceType
+				params = append(params, "type="+resourceType)
 			}
 			if region != "" {
-				opts.Region = &region
+				params = append(params, "region="+region)
 			}
 			if status != "" {
-				opts.Status = &status
+				params = append(params, "status="+status)
+			}
+			
+			for i, p := range params {
+				if i > 0 {
+					path += "&"
+				}
+				path += p
 			}
 
-			resources, err := apiClient.Resources().List(ctx, opts)
-			if err != nil {
+			// Use DoRaw to get paginated response
+			var response struct {
+				Data []struct {
+					ID            int64             `json:"id"`
+					ResourceID    string            `json:"resourceId,omitempty"`
+					Provider      string            `json:"provider"`
+					Name          string            `json:"name"`
+					Type          string            `json:"type"`
+					Region        string            `json:"region"`
+					Status        string            `json:"status"`
+					Tags          map[string]string `json:"tags,omitempty"`
+					Cost          float64           `json:"cost"`
+				} `json:"data"`
+				Page     int `json:"page"`
+				PageSize int `json:"pageSize"`
+				Total    int `json:"total"`
+			}
+			
+			if err := apiClient.DoRaw(ctx, "GET", path, nil, &response); err != nil {
 				return fmt.Errorf("failed to list resources: %w", err)
 			}
 
 			format := getOutputFormat()
 			if format != "table" {
-				return printOutput(resources)
+				return printOutput(response.Data)
 			}
 
-			t := NewTable("ID", "NAME", "TYPE", "REGION", "STATUS", "PROVIDER")
-			for _, r := range resources {
+			t := NewTable("RESOURCE ID", "NAME", "TYPE", "REGION", "STATUS", "PROVIDER")
+			for _, r := range response.Data {
 				t.AddRow(
-					strconv.FormatInt(r.ID, 10),
+					truncate(r.ResourceID, 20),
 					truncate(r.Name, 30),
-					r.ResourceType,
+					r.Type,
 					r.Region,
 					formatStatus(r.Status),
-					strconv.FormatInt(r.ProviderID, 10),
+					r.Provider,
 				)
 			}
 			t.Render()
+			fmt.Printf("\nShowing %d of %d resources\n", len(response.Data), response.Total)
 			return nil
 		},
 	}
 
-	cmd.Flags().StringVar(&provider, "provider", "", "filter by provider ID")
+	cmd.Flags().StringVar(&provider, "provider", "", "filter by provider type (aws, gcp, azure)")
 	cmd.Flags().StringVar(&resourceType, "type", "", "filter by resource type")
 	cmd.Flags().StringVar(&region, "region", "", "filter by region")
 	cmd.Flags().StringVar(&status, "status", "", "filter by status")
@@ -85,18 +106,29 @@ func newResourceListCmd() *cobra.Command {
 
 func newResourceGetCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "get <id>",
+		Use:   "get <resource-id>",
 		Short: "Get resource details",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			id, err := strconv.ParseInt(args[0], 10, 64)
-			if err != nil {
-				return fmt.Errorf("invalid resource ID: %s", args[0])
-			}
+			resourceID := args[0]
 
 			ctx := context.Background()
-			resource, err := apiClient.Resources().Get(ctx, id)
-			if err != nil {
+			
+			var resource struct {
+				ID            int64             `json:"id"`
+				ResourceID    string            `json:"resourceId,omitempty"`
+				Provider      string            `json:"provider"`
+				Name          string            `json:"name"`
+				Type          string            `json:"type"`
+				Region        string            `json:"region"`
+				Status        string            `json:"status"`
+				Tags          map[string]string `json:"tags,omitempty"`
+				Cost          float64           `json:"cost"`
+				Configuration string            `json:"configuration,omitempty"`
+			}
+			
+			path := fmt.Sprintf("/api/resources/%s", resourceID)
+			if err := apiClient.DoRaw(ctx, "GET", path, nil, &resource); err != nil {
 				return fmt.Errorf("failed to get resource: %w", err)
 			}
 
@@ -105,12 +137,13 @@ func newResourceGetCmd() *cobra.Command {
 				return printOutput(resource)
 			}
 
-			fmt.Printf("ID:       %d\n", resource.ID)
-			fmt.Printf("Name:     %s\n", resource.Name)
-			fmt.Printf("Type:     %s\n", resource.ResourceType)
-			fmt.Printf("Region:   %s\n", resource.Region)
-			fmt.Printf("Status:   %s\n", resource.Status)
-			fmt.Printf("Provider: %d\n", resource.ProviderID)
+			fmt.Printf("Resource ID: %s\n", resource.ResourceID)
+			fmt.Printf("Name:        %s\n", resource.Name)
+			fmt.Printf("Type:        %s\n", resource.Type)
+			fmt.Printf("Region:      %s\n", resource.Region)
+			fmt.Printf("Status:      %s\n", resource.Status)
+			fmt.Printf("Provider:    %s\n", resource.Provider)
+			fmt.Printf("Cost:        $%.2f\n", resource.Cost)
 			if len(resource.Tags) > 0 {
 				fmt.Println("Tags:")
 				for k, v := range resource.Tags {
@@ -124,17 +157,15 @@ func newResourceGetCmd() *cobra.Command {
 
 func newResourceDeleteCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "delete <id>",
+		Use:   "delete <resource-id>",
 		Short: "Delete a resource",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			id, err := strconv.ParseInt(args[0], 10, 64)
-			if err != nil {
-				return fmt.Errorf("invalid resource ID: %s", args[0])
-			}
+			resourceID := args[0]
 
 			ctx := context.Background()
-			if err := apiClient.Resources().Delete(ctx, id); err != nil {
+			path := fmt.Sprintf("/api/resources/%s", resourceID)
+			if err := apiClient.DoRaw(ctx, "DELETE", path, nil, nil); err != nil {
 				return fmt.Errorf("failed to delete resource: %w", err)
 			}
 
