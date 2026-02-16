@@ -61,10 +61,12 @@ func printOutput(data interface{}) error {
 		return printJSON(data)
 	case "yaml":
 		return printYAML(data)
+	case "table":
+		// printOutput does not render tables; commands that support table output
+		// should use the Table helper directly instead of this function.
+		return fmt.Errorf("table output is not supported for this command; use json or yaml")
 	default:
-		// For non-table formats, the caller should use Table directly.
-		// This fallback prints JSON if someone calls printOutput with table format.
-		return printJSON(data)
+		return fmt.Errorf("unsupported output format %q; valid formats are: json, yaml, table", format)
 	}
 }
 

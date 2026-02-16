@@ -12,7 +12,7 @@ build-cli:
 	GO111MODULE=on CGO_ENABLED=0 go build -o bin/infraaudit ./cmd/cli
 
 install-cli:
-	go install ./cmd/cli
+	GO111MODULE=on CGO_ENABLED=0 go build -o $$(go env GOPATH)/bin/infraaudit ./cmd/cli
 
 build-settings:
 	GO111MODULE=on CGO_ENABLED=0 go build -o bin/settings ./settings
