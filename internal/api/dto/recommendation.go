@@ -13,6 +13,7 @@ type RecommendationDTO struct {
 	Effort      string    `json:"effort"`
 	Impact      string    `json:"impact"`
 	Category    string    `json:"category"`
+	Status      string    `json:"status"`
 	Resources   []string  `json:"resources,omitempty"`
 	CreatedAt   time.Time `json:"created_at"`
 }
@@ -40,6 +41,7 @@ type UpdateRecommendationRequest struct {
 	Effort      *string   `json:"effort,omitempty"`
 	Impact      *string   `json:"impact,omitempty"`
 	Category    *string   `json:"category,omitempty"`
+	Status      *string   `json:"status,omitempty"`
 	Resources   *[]string `json:"resources,omitempty"`
 }
 

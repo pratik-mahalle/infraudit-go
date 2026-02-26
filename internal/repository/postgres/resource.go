@@ -28,12 +28,12 @@ func (r *ResourceRepository) Create(ctx context.Context, res *resource.Resource)
 	res.UpdatedAt = now
 
 	query := `
-		INSERT INTO resources (user_id, provider, resource_id, name, type, region, status)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO resources (user_id, provider, resource_id, name, resource_type, region, status, configuration)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	_, err := r.db.ExecContext(ctx, query,
-		res.UserID, res.Provider, res.ResourceID, res.Name, res.Type, res.Region, res.Status,
+		res.UserID, res.Provider, res.ResourceID, res.Name, res.Type, res.Region, res.Status, res.Configuration,
 	)
 	if err != nil {
 		return errors.DatabaseError("Failed to create resource", err)
@@ -45,14 +45,14 @@ func (r *ResourceRepository) Create(ctx context.Context, res *resource.Resource)
 // GetByID retrieves a resource by ID
 func (r *ResourceRepository) GetByID(ctx context.Context, userID int64, resourceID string) (*resource.Resource, error) {
 	query := `
-		SELECT user_id, provider, resource_id, name, type, region, status
+		SELECT user_id, provider, resource_id, name, resource_type, region, status, COALESCE(configuration, '')
 		FROM resources
 		WHERE user_id = ? AND resource_id = ?
 	`
 
 	var res resource.Resource
 	err := r.db.QueryRowContext(ctx, query, userID, resourceID).Scan(
-		&res.UserID, &res.Provider, &res.ResourceID, &res.Name, &res.Type, &res.Region, &res.Status,
+		&res.UserID, &res.Provider, &res.ResourceID, &res.Name, &res.Type, &res.Region, &res.Status, &res.Configuration,
 	)
 
 	if err == sql.ErrNoRows {
@@ -71,12 +71,12 @@ func (r *ResourceRepository) Update(ctx context.Context, res *resource.Resource)
 
 	query := `
 		UPDATE resources
-		SET name = ?, type = ?, region = ?, status = ?
+		SET name = ?, resource_type = ?, region = ?, status = ?, configuration = ?
 		WHERE user_id = ? AND resource_id = ?
 	`
 
 	result, err := r.db.ExecContext(ctx, query,
-		res.Name, res.Type, res.Region, res.Status, res.UserID, res.ResourceID,
+		res.Name, res.Type, res.Region, res.Status, res.Configuration, res.UserID, res.ResourceID,
 	)
 	if err != nil {
 		return errors.DatabaseError("Failed to update resource", err)
@@ -126,7 +126,7 @@ func (r *ResourceRepository) List(ctx context.Context, userID int64, filter reso
 		args = append(args, filter.Provider)
 	}
 	if filter.Type != "" {
-		where = append(where, "type = ?")
+		where = append(where, "resource_type = ?")
 		args = append(args, filter.Type)
 	}
 	if filter.Region != "" {
@@ -150,7 +150,7 @@ func (r *ResourceRepository) List(ctx context.Context, userID int64, filter reso
 
 	// Get resources
 	query := fmt.Sprintf(`
-		SELECT user_id, provider, resource_id, name, type, region, status
+		SELECT user_id, provider, resource_id, name, resource_type, region, status, COALESCE(configuration, '')
 		FROM resources
 		WHERE %s
 		ORDER BY provider, resource_id
@@ -168,7 +168,7 @@ func (r *ResourceRepository) List(ctx context.Context, userID int64, filter reso
 	resources := make([]*resource.Resource, 0, limit)
 	for rows.Next() {
 		var res resource.Resource
-		err := rows.Scan(&res.UserID, &res.Provider, &res.ResourceID, &res.Name, &res.Type, &res.Region, &res.Status)
+		err := rows.Scan(&res.UserID, &res.Provider, &res.ResourceID, &res.Name, &res.Type, &res.Region, &res.Status, &res.Configuration)
 		if err != nil {
 			return nil, 0, errors.DatabaseError("Failed to scan resource", err)
 		}
@@ -185,7 +185,7 @@ func (r *ResourceRepository) List(ctx context.Context, userID int64, filter reso
 // ListByProvider retrieves resources by provider
 func (r *ResourceRepository) ListByProvider(ctx context.Context, userID int64, provider string) ([]*resource.Resource, error) {
 	query := `
-		SELECT user_id, provider, resource_id, name, type, region, status
+		SELECT user_id, provider, resource_id, name, resource_type, region, status, COALESCE(configuration, '')
 		FROM resources
 		WHERE user_id = ? AND provider = ?
 		ORDER BY resource_id
@@ -200,7 +200,7 @@ func (r *ResourceRepository) ListByProvider(ctx context.Context, userID int64, p
 	var resources []*resource.Resource
 	for rows.Next() {
 		var res resource.Resource
-		err := rows.Scan(&res.UserID, &res.Provider, &res.ResourceID, &res.Name, &res.Type, &res.Region, &res.Status)
+		err := rows.Scan(&res.UserID, &res.Provider, &res.ResourceID, &res.Name, &res.Type, &res.Region, &res.Status, &res.Configuration)
 		if err != nil {
 			return nil, errors.DatabaseError("Failed to scan resource", err)
 		}
@@ -230,8 +230,8 @@ func (r *ResourceRepository) SaveBatch(ctx context.Context, userID int64, provid
 
 	// Insert new resources
 	stmt, err := tx.PrepareContext(ctx, `
-		INSERT INTO resources (user_id, provider, resource_id, name, type, region, status)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO resources (user_id, provider, resource_id, name, resource_type, region, status, configuration)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
 		return errors.DatabaseError("Failed to prepare statement", err)
@@ -239,7 +239,7 @@ func (r *ResourceRepository) SaveBatch(ctx context.Context, userID int64, provid
 	defer stmt.Close()
 
 	for _, res := range resources {
-		_, err := stmt.ExecContext(ctx, userID, provider, res.ResourceID, res.Name, res.Type, res.Region, res.Status)
+		_, err := stmt.ExecContext(ctx, userID, provider, res.ResourceID, res.Name, res.Type, res.Region, res.Status, res.Configuration)
 		if err != nil {
 			return errors.DatabaseError("Failed to insert resource", err)
 		}

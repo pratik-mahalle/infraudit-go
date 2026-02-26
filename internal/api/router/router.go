@@ -36,6 +36,8 @@ type Handlers struct {
 	Job          *handlers.JobHandler
 	Remediation  *handlers.RemediationHandler
 	Notification *handlers.NotificationHandler
+	// AI Analysis
+	Analysis *handlers.AnalysisHandler
 }
 
 func New(cfg *config.Config, log *logger.Logger, h *Handlers) http.Handler {
@@ -95,6 +97,7 @@ func New(cfg *config.Config, log *logger.Logger, h *Handlers) http.Handler {
 		r.Route("/api/v1/resources", func(r chi.Router) {
 			r.Get("/", h.Resource.List)
 			r.Post("/", h.Resource.Create)
+			r.Post("/analyze", h.Analysis.AnalyzeResource)
 			r.Get("/{id}", h.Resource.Get)
 			r.Put("/{id}", h.Resource.Update)
 			r.Delete("/{id}", h.Resource.Delete)
@@ -342,6 +345,7 @@ func New(cfg *config.Config, log *logger.Logger, h *Handlers) http.Handler {
 		// Resources aliases
 		r.Get("/api/resources", h.Resource.List)
 		r.Post("/api/resources", h.Resource.Create)
+		r.Post("/api/resources/analyze", h.Analysis.AnalyzeResource)
 		r.Get("/api/resources/{id}", h.Resource.Get)
 		r.Put("/api/resources/{id}", h.Resource.Update)
 		r.Delete("/api/resources/{id}", h.Resource.Delete)

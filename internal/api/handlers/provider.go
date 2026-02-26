@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 
@@ -142,6 +143,19 @@ func (h *ProviderHandler) Connect(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+
+	// Auto-sync resources after successful connection
+	go func() {
+		syncCtx := context.Background()
+		if err := h.service.Sync(syncCtx, userID, providerType); err != nil {
+			h.logger.ErrorWithErr(err, "Auto-sync after connect failed")
+		} else {
+			h.logger.WithFields(map[string]interface{}{
+				"user_id":  userID,
+				"provider": providerType,
+			}).Info("Auto-sync after connect completed")
+		}
+	}()
 
 	utils.WriteSuccessWithMessage(w, http.StatusOK, "Provider connected successfully", nil)
 }

@@ -33,18 +33,15 @@ CREATE INDEX IF NOT EXISTS idx_resource_costs_service_name ON resource_costs(ser
 
 -- Cost anomalies table
 CREATE TABLE IF NOT EXISTS cost_anomalies (
-    id VARCHAR(36) PRIMARY KEY,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id BIGINT NOT NULL,
-    provider VARCHAR(50) NOT NULL,
-    service_name VARCHAR(255) NOT NULL,
-    resource_id VARCHAR(36),
+    resource_id VARCHAR(255),
     anomaly_type VARCHAR(50) NOT NULL,
-    expected_cost DECIMAL(15, 4) NOT NULL,
-    actual_cost DECIMAL(15, 4) NOT NULL,
-    deviation DECIMAL(10, 2) NOT NULL,
     severity VARCHAR(20) NOT NULL,
+    percentage DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    previous_cost DECIMAL(15, 4) NOT NULL DEFAULT 0,
+    current_cost DECIMAL(15, 4) NOT NULL DEFAULT 0,
     status VARCHAR(50) DEFAULT 'open',
-    notes TEXT,
     detected_at TIMESTAMP NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

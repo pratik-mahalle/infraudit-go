@@ -14,6 +14,7 @@ type Recommendation struct {
 	Effort      string    `json:"effort"`
 	Impact      string    `json:"impact"`
 	Category    string    `json:"category"`
+	Status      string    `json:"status"`
 	Resources   []string  `json:"resources,omitempty"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at,omitempty"`
@@ -50,9 +51,17 @@ const (
 	ImpactLow    = "low"
 )
 
+// Status levels
+const (
+	StatusPending   = "pending"
+	StatusApplied   = "applied"
+	StatusDismissed = "dismissed"
+)
+
 // Filter contains recommendation filtering options
 type Filter struct {
 	Type     string
 	Priority string
 	Category string
+	Status   string
 }

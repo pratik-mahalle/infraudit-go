@@ -24,7 +24,7 @@ func (r *DriftRepository) Create(ctx context.Context, d *drift.Drift) (int64, er
 	d.CreatedAt = now
 	d.DetectedAt = now
 
-	query := `INSERT INTO security_drifts (user_id, resource_id, drift_type, severity, details, detected_at, status) VALUES (?, ?, ?, ?, ?, ?, ?)`
+	query := `INSERT INTO drifts (user_id, resource_id, drift_type, severity, details, detected_at, status) VALUES (?, ?, ?, ?, ?, ?, ?)`
 
 	result, err := r.db.ExecContext(ctx, query, d.UserID, d.ResourceID, d.DriftType, d.Severity, d.Details, now.Format(time.RFC3339), d.Status)
 	if err != nil {
@@ -35,7 +35,7 @@ func (r *DriftRepository) Create(ctx context.Context, d *drift.Drift) (int64, er
 }
 
 func (r *DriftRepository) GetByID(ctx context.Context, userID int64, id int64) (*drift.Drift, error) {
-	query := `SELECT id, user_id, resource_id, drift_type, severity, details, detected_at, status FROM security_drifts WHERE user_id = ? AND id = ?`
+	query := `SELECT id, user_id, resource_id, drift_type, severity, details, detected_at, status FROM drifts WHERE user_id = ? AND id = ?`
 
 	var d drift.Drift
 	var detectedAt string
@@ -54,7 +54,7 @@ func (r *DriftRepository) GetByID(ctx context.Context, userID int64, id int64) (
 
 func (r *DriftRepository) Update(ctx context.Context, d *drift.Drift) error {
 	d.UpdatedAt = time.Now()
-	query := `UPDATE security_drifts SET resource_id = ?, drift_type = ?, severity = ?, details = ?, status = ? WHERE user_id = ? AND id = ?`
+	query := `UPDATE drifts SET resource_id = ?, drift_type = ?, severity = ?, details = ?, status = ? WHERE user_id = ? AND id = ?`
 
 	result, err := r.db.ExecContext(ctx, query, d.ResourceID, d.DriftType, d.Severity, d.Details, d.Status, d.UserID, d.ID)
 	if err != nil {
@@ -70,7 +70,7 @@ func (r *DriftRepository) Update(ctx context.Context, d *drift.Drift) error {
 }
 
 func (r *DriftRepository) Delete(ctx context.Context, userID int64, id int64) error {
-	result, err := r.db.ExecContext(ctx, "DELETE FROM security_drifts WHERE user_id = ? AND id = ?", userID, id)
+	result, err := r.db.ExecContext(ctx, "DELETE FROM drifts WHERE user_id = ? AND id = ?", userID, id)
 	if err != nil {
 		return errors.DatabaseError("Failed to delete drift", err)
 	}
@@ -104,7 +104,7 @@ func (r *DriftRepository) List(ctx context.Context, userID int64, filter drift.F
 		args = append(args, filter.Status)
 	}
 
-	query := fmt.Sprintf(`SELECT id, user_id, resource_id, drift_type, severity, details, detected_at, status FROM security_drifts WHERE %s ORDER BY id DESC`, strings.Join(where, " AND "))
+	query := fmt.Sprintf(`SELECT id, user_id, resource_id, drift_type, severity, details, detected_at, status FROM drifts WHERE %s ORDER BY id DESC`, strings.Join(where, " AND "))
 
 	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
@@ -144,12 +144,12 @@ func (r *DriftRepository) ListWithPagination(ctx context.Context, userID int64, 
 	whereClause := strings.Join(where, " AND ")
 
 	var total int64
-	err := r.db.QueryRowContext(ctx, fmt.Sprintf("SELECT COUNT(*) FROM security_drifts WHERE %s", whereClause), args...).Scan(&total)
+	err := r.db.QueryRowContext(ctx, fmt.Sprintf("SELECT COUNT(*) FROM drifts WHERE %s", whereClause), args...).Scan(&total)
 	if err != nil {
 		return nil, 0, errors.DatabaseError("Failed to count drifts", err)
 	}
 
-	query := fmt.Sprintf(`SELECT id, user_id, resource_id, drift_type, severity, details, detected_at, status FROM security_drifts WHERE %s ORDER BY id DESC LIMIT ? OFFSET ?`, whereClause)
+	query := fmt.Sprintf(`SELECT id, user_id, resource_id, drift_type, severity, details, detected_at, status FROM drifts WHERE %s ORDER BY id DESC LIMIT ? OFFSET ?`, whereClause)
 
 	args = append(args, limit, offset)
 	rows, err := r.db.QueryContext(ctx, query, args...)
@@ -175,7 +175,7 @@ func (r *DriftRepository) ListWithPagination(ctx context.Context, userID int64, 
 }
 
 func (r *DriftRepository) CountBySeverity(ctx context.Context, userID int64) (map[string]int, error) {
-	query := `SELECT severity, COUNT(*) FROM security_drifts WHERE user_id = ? GROUP BY severity`
+	query := `SELECT severity, COUNT(*) FROM drifts WHERE user_id = ? GROUP BY severity`
 
 	rows, err := r.db.QueryContext(ctx, query, userID)
 	if err != nil {
