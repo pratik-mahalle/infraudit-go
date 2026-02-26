@@ -54,6 +54,7 @@ func (h *RecommendationHandler) List(w http.ResponseWriter, r *http.Request) {
 		Type:     r.URL.Query().Get("type"),
 		Priority: r.URL.Query().Get("priority"),
 		Category: r.URL.Query().Get("category"),
+		Status:   r.URL.Query().Get("status"),
 	}
 
 	offset := (page - 1) * pageSize
@@ -65,9 +66,13 @@ func (h *RecommendationHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	dtos := make([]dto.RecommendationDTO, len(recs))
 	for i, rec := range recs {
+		status := rec.Status
+		if status == "" {
+			status = "pending"
+		}
 		dtos[i] = dto.RecommendationDTO{
 			ID: rec.ID, Type: rec.Type, Priority: rec.Priority, Title: rec.Title, Description: rec.Description,
-			Savings: rec.Savings, Effort: rec.Effort, Impact: rec.Impact, Category: rec.Category, Resources: rec.Resources, CreatedAt: rec.CreatedAt,
+			Savings: rec.Savings, Effort: rec.Effort, Impact: rec.Impact, Category: rec.Category, Status: status, Resources: rec.Resources, CreatedAt: rec.CreatedAt,
 		}
 	}
 
@@ -99,9 +104,13 @@ func (h *RecommendationHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	status := rec.Status
+	if status == "" {
+		status = "pending"
+	}
 	utils.WriteSuccess(w, http.StatusOK, dto.RecommendationDTO{
 		ID: rec.ID, Type: rec.Type, Priority: rec.Priority, Title: rec.Title, Description: rec.Description,
-		Savings: rec.Savings, Effort: rec.Effort, Impact: rec.Impact, Category: rec.Category, Resources: rec.Resources, CreatedAt: rec.CreatedAt,
+		Savings: rec.Savings, Effort: rec.Effort, Impact: rec.Impact, Category: rec.Category, Status: status, Resources: rec.Resources, CreatedAt: rec.CreatedAt,
 	})
 }
 
@@ -192,6 +201,9 @@ func (h *RecommendationHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Category != nil {
 		updates["category"] = *req.Category
+	}
+	if req.Status != nil {
+		updates["status"] = *req.Status
 	}
 	if req.Resources != nil {
 		updates["resources"] = *req.Resources

@@ -94,13 +94,19 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Use Lax SameSite in development (Strict can block cookies behind proxies)
+	sameSite := http.SameSiteLaxMode
+	if h.config.Server.Environment == "production" {
+		sameSite = http.SameSiteStrictMode
+	}
+
 	// Set cookies
 	http.SetCookie(w, &http.Cookie{
 		Name:     "accessToken",
 		Value:    tokens.AccessToken,
 		HttpOnly: true,
 		Secure:   h.config.Server.Environment == "production",
-		SameSite: http.SameSiteStrictMode,
+		SameSite: sameSite,
 		Path:     "/",
 		MaxAge:   int(h.config.Auth.AccessTokenExpiry.Seconds()),
 	})
@@ -110,7 +116,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		Value:    tokens.RefreshToken,
 		HttpOnly: true,
 		Secure:   h.config.Server.Environment == "production",
-		SameSite: http.SameSiteStrictMode,
+		SameSite: sameSite,
 		Path:     "/",
 		MaxAge:   int(h.config.Auth.RefreshTokenExpiry.Seconds()),
 	})
@@ -205,13 +211,19 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Use Lax SameSite in development (Strict can block cookies behind proxies)
+	regSameSite := http.SameSiteLaxMode
+	if h.config.Server.Environment == "production" {
+		regSameSite = http.SameSiteStrictMode
+	}
+
 	// Set cookies
 	http.SetCookie(w, &http.Cookie{
 		Name:     "accessToken",
 		Value:    tokens.AccessToken,
 		HttpOnly: true,
 		Secure:   h.config.Server.Environment == "production",
-		SameSite: http.SameSiteStrictMode,
+		SameSite: regSameSite,
 		Path:     "/",
 		MaxAge:   int(h.config.Auth.AccessTokenExpiry.Seconds()),
 	})
@@ -221,7 +233,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		Value:    tokens.RefreshToken,
 		HttpOnly: true,
 		Secure:   h.config.Server.Environment == "production",
-		SameSite: http.SameSiteStrictMode,
+		SameSite: regSameSite,
 		Path:     "/",
 		MaxAge:   int(h.config.Auth.RefreshTokenExpiry.Seconds()),
 	})

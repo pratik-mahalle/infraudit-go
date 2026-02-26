@@ -45,10 +45,14 @@ func (r *ComplianceRepository) GetFramework(ctx context.Context, id string) (*co
 		WHERE id = ?
 	`
 	f := &compliance.Framework{}
+	var provider sql.NullString
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
-		&f.ID, &f.Name, &f.Version, &f.Description, &f.Provider, &f.IsEnabled,
+		&f.ID, &f.Name, &f.Version, &f.Description, &provider, &f.IsEnabled,
 		&f.CreatedAt, &f.UpdatedAt,
 	)
+	if provider.Valid {
+		f.Provider = provider.String
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -63,10 +67,14 @@ func (r *ComplianceRepository) GetFrameworkByName(ctx context.Context, name stri
 		WHERE name = ?
 	`
 	f := &compliance.Framework{}
+	var provider sql.NullString
 	err := r.db.QueryRowContext(ctx, query, name).Scan(
-		&f.ID, &f.Name, &f.Version, &f.Description, &f.Provider, &f.IsEnabled,
+		&f.ID, &f.Name, &f.Version, &f.Description, &provider, &f.IsEnabled,
 		&f.CreatedAt, &f.UpdatedAt,
 	)
+	if provider.Valid {
+		f.Provider = provider.String
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -89,10 +97,14 @@ func (r *ComplianceRepository) ListFrameworks(ctx context.Context) ([]*complianc
 	var frameworks []*compliance.Framework
 	for rows.Next() {
 		f := &compliance.Framework{}
+		var provider sql.NullString
 		err := rows.Scan(
-			&f.ID, &f.Name, &f.Version, &f.Description, &f.Provider, &f.IsEnabled,
+			&f.ID, &f.Name, &f.Version, &f.Description, &provider, &f.IsEnabled,
 			&f.CreatedAt, &f.UpdatedAt,
 		)
+		if provider.Valid {
+			f.Provider = provider.String
+		}
 		if err != nil {
 			return nil, err
 		}

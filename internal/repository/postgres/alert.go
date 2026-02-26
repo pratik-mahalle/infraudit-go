@@ -25,7 +25,7 @@ func (r *AlertRepository) Create(ctx context.Context, a *alert.Alert) (int64, er
 	a.UpdatedAt = now
 
 	query := `
-		INSERT INTO alerts (user_id, type, severity, title, description, resource, status, timestamp)
+		INSERT INTO alerts (user_id, type, severity, title, description, resource, status, created_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
@@ -46,7 +46,7 @@ func (r *AlertRepository) Create(ctx context.Context, a *alert.Alert) (int64, er
 
 func (r *AlertRepository) GetByID(ctx context.Context, userID int64, id int64) (*alert.Alert, error) {
 	query := `
-		SELECT id, user_id, type, severity, title, description, resource, status, timestamp
+		SELECT id, user_id, type, severity, title, description, resource, status, created_at
 		FROM alerts WHERE user_id = ? AND id = ?
 	`
 
@@ -132,7 +132,7 @@ func (r *AlertRepository) List(ctx context.Context, userID int64, filter alert.F
 	}
 
 	query := fmt.Sprintf(`
-		SELECT id, user_id, type, severity, title, description, resource, status, timestamp
+		SELECT id, user_id, type, severity, title, description, resource, status, created_at
 		FROM alerts WHERE %s ORDER BY id DESC
 	`, strings.Join(where, " AND "))
 
@@ -185,7 +185,7 @@ func (r *AlertRepository) ListWithPagination(ctx context.Context, userID int64, 
 	}
 
 	query := fmt.Sprintf(`
-		SELECT id, user_id, type, severity, title, description, resource, status, timestamp
+		SELECT id, user_id, type, severity, title, description, resource, status, created_at
 		FROM alerts WHERE %s ORDER BY id DESC LIMIT ? OFFSET ?
 	`, whereClause)
 

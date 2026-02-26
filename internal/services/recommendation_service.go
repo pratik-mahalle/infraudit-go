@@ -80,6 +80,9 @@ func (s *RecommendationService) Update(ctx context.Context, userID int64, id int
 	if category, ok := updates["category"].(string); ok {
 		rec.Category = category
 	}
+	if status, ok := updates["status"].(string); ok {
+		rec.Status = status
+	}
 	if resources, ok := updates["resources"].([]string); ok {
 		rec.Resources = resources
 	}
@@ -129,11 +132,6 @@ func (s *RecommendationService) GenerateRecommendations(ctx context.Context, use
 	s.logger.WithFields(map[string]interface{}{
 		"user_id": userID,
 	}).Info("Generating recommendations using AI engine")
-
-	if s.engine == nil {
-		s.logger.Warn("Recommendation engine is not configured")
-		return fmt.Errorf("recommendation engine is not available")
-	}
 
 	if err := s.engine.GenerateRecommendations(ctx, userID); err != nil {
 		s.logger.ErrorWithErr(err, "Failed to generate recommendations")

@@ -8,14 +8,16 @@ import (
 	"github.com/pratik-mahalle/infraudit/internal/api/middleware"
 )
 
-// getUserIDFromContext extracts the user ID from the request context
+// getUserIDFromContext extracts the user ID from the request context.
+// When auth is disabled (no JWT in context), falls back to user ID 1
+// so all API endpoints remain functional during development.
 func getUserIDFromContext(ctx context.Context) int64 {
-	// Create a minimal request to use middleware.GetUserID
-	// This is a helper for when we already have a context
 	if userID, ok := ctx.Value(middleware.UserIDKey).(int64); ok {
 		return userID
 	}
-	return 0
+	// AUTH DISABLED FALLBACK: return default dev user so endpoints work without login.
+	// To re-enable strict auth, change this back to `return 0`.
+	return 1
 }
 
 // respondJSON sends a JSON response

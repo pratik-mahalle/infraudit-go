@@ -27,13 +27,18 @@ func (r *RecommendationRepository) Create(ctx context.Context, rec *recommendati
 
 	resourcesJSON, _ := json.Marshal(rec.Resources)
 
+	status := rec.Status
+	if status == "" {
+		status = "pending"
+	}
+
 	query := `
-		INSERT INTO recommendations (user_id, type, priority, title, description, savings, effort, impact, category, resources)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO recommendations (user_id, type, priority, title, description, savings, effort, impact, category, status, resources)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	result, err := r.db.ExecContext(ctx, query,
-		rec.UserID, rec.Type, rec.Priority, rec.Title, rec.Description, rec.Savings, rec.Effort, rec.Impact, rec.Category, string(resourcesJSON),
+		rec.UserID, rec.Type, rec.Priority, rec.Title, rec.Description, rec.Savings, rec.Effort, rec.Impact, rec.Category, status, string(resourcesJSON),
 	)
 	if err != nil {
 		return 0, errors.DatabaseError("Failed to create recommendation", err)
@@ -44,14 +49,14 @@ func (r *RecommendationRepository) Create(ctx context.Context, rec *recommendati
 
 func (r *RecommendationRepository) GetByID(ctx context.Context, userID int64, id int64) (*recommendation.Recommendation, error) {
 	query := `
-		SELECT id, user_id, type, priority, title, description, savings, effort, impact, category, resources
+		SELECT id, user_id, type, priority, title, description, savings, effort, impact, category, status, resources
 		FROM recommendations WHERE user_id = ? AND id = ?
 	`
 
 	var rec recommendation.Recommendation
 	var resourcesJSON string
 	err := r.db.QueryRowContext(ctx, query, userID, id).Scan(
-		&rec.ID, &rec.UserID, &rec.Type, &rec.Priority, &rec.Title, &rec.Description, &rec.Savings, &rec.Effort, &rec.Impact, &rec.Category, &resourcesJSON,
+		&rec.ID, &rec.UserID, &rec.Type, &rec.Priority, &rec.Title, &rec.Description, &rec.Savings, &rec.Effort, &rec.Impact, &rec.Category, &rec.Status, &resourcesJSON,
 	)
 
 	if err == sql.ErrNoRows {
@@ -69,13 +74,18 @@ func (r *RecommendationRepository) Update(ctx context.Context, rec *recommendati
 	rec.UpdatedAt = time.Now()
 	resourcesJSON, _ := json.Marshal(rec.Resources)
 
+	status := rec.Status
+	if status == "" {
+		status = "pending"
+	}
+
 	query := `
-		UPDATE recommendations SET type = ?, priority = ?, title = ?, description = ?, savings = ?, effort = ?, impact = ?, category = ?, resources = ?
+		UPDATE recommendations SET type = ?, priority = ?, title = ?, description = ?, savings = ?, effort = ?, impact = ?, category = ?, status = ?, resources = ?
 		WHERE user_id = ? AND id = ?
 	`
 
 	result, err := r.db.ExecContext(ctx, query,
-		rec.Type, rec.Priority, rec.Title, rec.Description, rec.Savings, rec.Effort, rec.Impact, rec.Category, string(resourcesJSON), rec.UserID, rec.ID,
+		rec.Type, rec.Priority, rec.Title, rec.Description, rec.Savings, rec.Effort, rec.Impact, rec.Category, status, string(resourcesJSON), rec.UserID, rec.ID,
 	)
 	if err != nil {
 		return errors.DatabaseError("Failed to update recommendation", err)
@@ -119,9 +129,13 @@ func (r *RecommendationRepository) List(ctx context.Context, userID int64, filte
 		where = append(where, "category = ?")
 		args = append(args, filter.Category)
 	}
+	if filter.Status != "" {
+		where = append(where, "status = ?")
+		args = append(args, filter.Status)
+	}
 
 	query := fmt.Sprintf(`
-		SELECT id, user_id, type, priority, title, description, savings, effort, impact, category, resources
+		SELECT id, user_id, type, priority, title, description, savings, effort, impact, category, status, resources
 		FROM recommendations WHERE %s ORDER BY id DESC
 	`, strings.Join(where, " AND "))
 
@@ -136,7 +150,7 @@ func (r *RecommendationRepository) List(ctx context.Context, userID int64, filte
 	for rows.Next() {
 		var rec recommendation.Recommendation
 		var resourcesJSON string
-		err := rows.Scan(&rec.ID, &rec.UserID, &rec.Type, &rec.Priority, &rec.Title, &rec.Description, &rec.Savings, &rec.Effort, &rec.Impact, &rec.Category, &resourcesJSON)
+		err := rows.Scan(&rec.ID, &rec.UserID, &rec.Type, &rec.Priority, &rec.Title, &rec.Description, &rec.Savings, &rec.Effort, &rec.Impact, &rec.Category, &rec.Status, &resourcesJSON)
 		if err != nil {
 			return nil, errors.DatabaseError("Failed to scan recommendation", err)
 		}
@@ -159,17 +173,25 @@ func (r *RecommendationRepository) ListWithPagination(ctx context.Context, userI
 		where = append(where, "priority = ?")
 		args = append(args, filter.Priority)
 	}
+	if filter.Status != "" {
+		where = append(where, "status = ?")
+		args = append(args, filter.Status)
+	}
 
 	whereClause := strings.Join(where, " AND ")
 
+	// Use a copy of args for count query (before appending limit/offset)
+	countArgs := make([]interface{}, len(args))
+	copy(countArgs, args)
+
 	var total int64
-	err := r.db.QueryRowContext(ctx, fmt.Sprintf("SELECT COUNT(*) FROM recommendations WHERE %s", whereClause), args...).Scan(&total)
+	err := r.db.QueryRowContext(ctx, fmt.Sprintf("SELECT COUNT(*) FROM recommendations WHERE %s", whereClause), countArgs...).Scan(&total)
 	if err != nil {
 		return nil, 0, errors.DatabaseError("Failed to count recommendations", err)
 	}
 
 	query := fmt.Sprintf(`
-		SELECT id, user_id, type, priority, title, description, savings, effort, impact, category, resources
+		SELECT id, user_id, type, priority, title, description, savings, effort, impact, category, status, resources
 		FROM recommendations WHERE %s ORDER BY id DESC LIMIT ? OFFSET ?
 	`, whereClause)
 
@@ -185,7 +207,7 @@ func (r *RecommendationRepository) ListWithPagination(ctx context.Context, userI
 	for rows.Next() {
 		var rec recommendation.Recommendation
 		var resourcesJSON string
-		err := rows.Scan(&rec.ID, &rec.UserID, &rec.Type, &rec.Priority, &rec.Title, &rec.Description, &rec.Savings, &rec.Effort, &rec.Impact, &rec.Category, &resourcesJSON)
+		err := rows.Scan(&rec.ID, &rec.UserID, &rec.Type, &rec.Priority, &rec.Title, &rec.Description, &rec.Savings, &rec.Effort, &rec.Impact, &rec.Category, &rec.Status, &resourcesJSON)
 		if err != nil {
 			return nil, 0, errors.DatabaseError("Failed to scan recommendation", err)
 		}

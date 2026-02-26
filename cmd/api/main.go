@@ -156,17 +156,19 @@ func main() {
 	vulnerabilityService := services.NewVulnerabilityService(vulnerabilityRepo, log, trivyScanner, nvdScanner)
 	iacService := services.NewIaCService(iacRepo, resourceService.(*services.ResourceService), driftService.(*services.DriftService))
 
-	// Initialize recommendation engine (if Gemini is available)
+	// Initialize recommendation engine (works with or without Gemini)
+	recommendationEngine = services.NewRecommendationEngine(
+		geminiClient, // may be nil - engine uses rule-based fallback
+		resourceRepo,
+		vulnerabilityRepo,
+		driftRepo,
+		recommendationRepo,
+		log,
+	)
 	if geminiClient != nil {
-		recommendationEngine = services.NewRecommendationEngine(
-			geminiClient,
-			resourceRepo,
-			vulnerabilityRepo,
-			driftRepo,
-			recommendationRepo,
-			log,
-		)
-		log.Info("Recommendation engine initialized")
+		log.Info("Recommendation engine initialized with AI support")
+	} else {
+		log.Info("Recommendation engine initialized with rule-based analysis (no AI)")
 	}
 
 	// Initialize cost service
@@ -222,6 +224,7 @@ func main() {
 		Job:            handlers.NewJobHandler(jobService, log),
 		Remediation:    handlers.NewRemediationHandler(remediationService, log),
 		Notification:   handlers.NewNotificationHandler(notificationService, log),
+		Analysis:       handlers.NewAnalysisHandler(geminiClient, log),
 	}
 
 	// Setup router
