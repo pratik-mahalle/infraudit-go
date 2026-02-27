@@ -111,9 +111,6 @@ func (h *ProviderHandler) Connect(w http.ResponseWriter, r *http.Request) {
 		}
 		creds.GCPProjectID = *req.GCPProjectID
 		creds.GCPServiceAccountJSON = *req.GCPServiceAccountJSON
-		if req.GCPRegion != nil {
-			creds.GCPRegion = *req.GCPRegion
-		}
 
 	case "azure":
 		if req.AzureTenantID == nil || req.AzureClientID == nil || req.AzureClientSecret == nil || req.AzureSubscriptionID == nil {
@@ -124,9 +121,6 @@ func (h *ProviderHandler) Connect(w http.ResponseWriter, r *http.Request) {
 		creds.AzureClientID = *req.AzureClientID
 		creds.AzureClientSecret = *req.AzureClientSecret
 		creds.AzureSubscriptionID = *req.AzureSubscriptionID
-		if req.AzureLocation != nil {
-			creds.AzureLocation = *req.AzureLocation
-		}
 
 	default:
 		utils.WriteError(w, errors.BadRequest("Unsupported provider type"))
