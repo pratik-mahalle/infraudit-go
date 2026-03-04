@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -44,7 +45,7 @@ func (r *IaCRepository) CreateDefinition(ctx context.Context, def *iac.IaCDefini
 	query := `
 		INSERT INTO iac_definitions
 		(id, user_id, name, iac_type, file_path, content, parsed_resources, last_parsed, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 	`
 
 	_, err := r.db.ExecContext(ctx, query,
@@ -72,7 +73,7 @@ func (r *IaCRepository) GetDefinitionByID(ctx context.Context, userID, definitio
 	query := `
 		SELECT id, user_id, name, iac_type, file_path, content, parsed_resources, last_parsed, created_at, updated_at
 		FROM iac_definitions
-		WHERE id = ? AND user_id = ?
+		WHERE id = $1 AND user_id = $2
 	`
 
 	var def iac.IaCDefinition
@@ -115,17 +116,20 @@ func (r *IaCRepository) GetDefinitionByID(ctx context.Context, userID, definitio
 
 // ListDefinitions lists all IaC definitions for a user
 func (r *IaCRepository) ListDefinitions(ctx context.Context, userID string, iacType *iac.IaCType) ([]*iac.IaCDefinition, error) {
-	query := `
+	paramN := 1
+	query := fmt.Sprintf(`
 		SELECT id, user_id, name, iac_type, file_path, content, parsed_resources, last_parsed, created_at, updated_at
 		FROM iac_definitions
-		WHERE user_id = ?
-	`
+		WHERE user_id = $%d
+	`, paramN)
 
 	args := []interface{}{userID}
+	paramN++
 
 	if iacType != nil {
-		query += " AND iac_type = ?"
+		query += fmt.Sprintf(" AND iac_type = $%d", paramN)
 		args = append(args, *iacType)
+		paramN++
 	}
 
 	query += " ORDER BY created_at DESC"
@@ -192,8 +196,8 @@ func (r *IaCRepository) UpdateDefinition(ctx context.Context, def *iac.IaCDefini
 
 	query := `
 		UPDATE iac_definitions
-		SET name = ?, content = ?, parsed_resources = ?, last_parsed = ?, updated_at = ?
-		WHERE id = ? AND user_id = ?
+		SET name = $1, content = $2, parsed_resources = $3, last_parsed = $4, updated_at = $5
+		WHERE id = $6 AND user_id = $7
 	`
 
 	result, err := r.db.ExecContext(ctx, query,
@@ -224,7 +228,7 @@ func (r *IaCRepository) UpdateDefinition(ctx context.Context, def *iac.IaCDefini
 
 // DeleteDefinition deletes an IaC definition
 func (r *IaCRepository) DeleteDefinition(ctx context.Context, userID, definitionID string) error {
-	query := `DELETE FROM iac_definitions WHERE id = ? AND user_id = ?`
+	query := `DELETE FROM iac_definitions WHERE id = $1 AND user_id = $2`
 
 	result, err := r.db.ExecContext(ctx, query, definitionID, userID)
 	if err != nil {
@@ -261,7 +265,7 @@ func (r *IaCRepository) CreateResource(ctx context.Context, res *iac.IaCResource
 	query := `
 		INSERT INTO iac_resources
 		(id, iac_definition_id, user_id, resource_type, resource_name, resource_address, provider, configuration, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 	`
 
 	_, err = r.db.ExecContext(ctx, query,
@@ -288,7 +292,7 @@ func (r *IaCRepository) ListResourcesByDefinition(ctx context.Context, userID, d
 	query := `
 		SELECT id, iac_definition_id, user_id, resource_type, resource_name, resource_address, provider, configuration, created_at
 		FROM iac_resources
-		WHERE iac_definition_id = ? AND user_id = ?
+		WHERE iac_definition_id = $1 AND user_id = $2
 		ORDER BY resource_type, resource_name
 	`
 
@@ -332,7 +336,7 @@ func (r *IaCRepository) ListResourcesByDefinition(ctx context.Context, userID, d
 
 // DeleteResourcesByDefinition deletes all resources for an IaC definition
 func (r *IaCRepository) DeleteResourcesByDefinition(ctx context.Context, userID, definitionID string) error {
-	query := `DELETE FROM iac_resources WHERE iac_definition_id = ? AND user_id = ?`
+	query := `DELETE FROM iac_resources WHERE iac_definition_id = $1 AND user_id = $2`
 
 	_, err := r.db.ExecContext(ctx, query, definitionID, userID)
 	if err != nil {
@@ -380,7 +384,7 @@ func (r *IaCRepository) CreateDriftResult(ctx context.Context, drift *iac.IaCDri
 	query := `
 		INSERT INTO iac_drift_results
 		(id, user_id, iac_definition_id, iac_resource_id, actual_resource_id, drift_category, severity, details, detected_at, status, resolved_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 	`
 
 	_, err := r.db.ExecContext(ctx, query,
@@ -406,27 +410,32 @@ func (r *IaCRepository) CreateDriftResult(ctx context.Context, drift *iac.IaCDri
 
 // ListDriftResults lists drift results with optional filtering
 func (r *IaCRepository) ListDriftResults(ctx context.Context, userID string, definitionID *string, category *iac.DriftCategory, status *iac.DriftStatus) ([]*iac.IaCDriftResult, error) {
-	query := `
+	paramN := 1
+	query := fmt.Sprintf(`
 		SELECT id, user_id, iac_definition_id, iac_resource_id, actual_resource_id, drift_category, severity, details, detected_at, status, resolved_at
 		FROM iac_drift_results
-		WHERE user_id = ?
-	`
+		WHERE user_id = $%d
+	`, paramN)
 
 	args := []interface{}{userID}
+	paramN++
 
 	if definitionID != nil {
-		query += " AND iac_definition_id = ?"
+		query += fmt.Sprintf(" AND iac_definition_id = $%d", paramN)
 		args = append(args, *definitionID)
+		paramN++
 	}
 
 	if category != nil {
-		query += " AND drift_category = ?"
+		query += fmt.Sprintf(" AND drift_category = $%d", paramN)
 		args = append(args, *category)
+		paramN++
 	}
 
 	if status != nil {
-		query += " AND status = ?"
+		query += fmt.Sprintf(" AND status = $%d", paramN)
 		args = append(args, *status)
+		paramN++
 	}
 
 	query += " ORDER BY detected_at DESC"
@@ -499,8 +508,8 @@ func (r *IaCRepository) ListDriftResults(ctx context.Context, userID string, def
 func (r *IaCRepository) UpdateDriftStatus(ctx context.Context, userID, driftID string, status iac.DriftStatus) error {
 	query := `
 		UPDATE iac_drift_results
-		SET status = ?, resolved_at = ?
-		WHERE id = ? AND user_id = ?
+		SET status = $1, resolved_at = $2
+		WHERE id = $3 AND user_id = $4
 	`
 
 	var resolvedAt sql.NullTime
@@ -527,20 +536,23 @@ func (r *IaCRepository) UpdateDriftStatus(ctx context.Context, userID, driftID s
 
 // GetDriftSummary returns a summary of drift results by category and severity
 func (r *IaCRepository) GetDriftSummary(ctx context.Context, userID string, definitionID *string) (map[string]interface{}, error) {
-	query := `
+	paramN := 1
+	query := fmt.Sprintf(`
 		SELECT
 			drift_category,
 			severity,
 			COUNT(*) as count
 		FROM iac_drift_results
-		WHERE user_id = ? AND status = ?
-	`
+		WHERE user_id = $%d AND status = $%d
+	`, paramN, paramN+1)
 
 	args := []interface{}{userID, iac.DriftStatusDetected}
+	paramN += 2
 
 	if definitionID != nil {
-		query += " AND iac_definition_id = ?"
+		query += fmt.Sprintf(" AND iac_definition_id = $%d", paramN)
 		args = append(args, *definitionID)
+		paramN++
 	}
 
 	query += " GROUP BY drift_category, severity"
@@ -552,7 +564,7 @@ func (r *IaCRepository) GetDriftSummary(ctx context.Context, userID string, defi
 	defer rows.Close()
 
 	summary := map[string]interface{}{
-		"total":    0,
+		"total":       0,
 		"by_category": make(map[string]int),
 		"by_severity": make(map[string]int),
 	}

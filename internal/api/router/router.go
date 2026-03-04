@@ -7,6 +7,7 @@ import (
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/pratik-mahalle/infraudit/internal/api/handlers"
 	"github.com/pratik-mahalle/infraudit/internal/api/middleware"
+	"github.com/pratik-mahalle/infraudit/internal/auth"
 	"github.com/pratik-mahalle/infraudit/internal/config"
 	"github.com/pratik-mahalle/infraudit/internal/pkg/logger"
 	"github.com/pratik-mahalle/infraudit/internal/pkg/metrics"
@@ -40,7 +41,7 @@ type Handlers struct {
 	Analysis *handlers.AnalysisHandler
 }
 
-func New(cfg *config.Config, log *logger.Logger, h *Handlers) http.Handler {
+func New(cfg *config.Config, log *logger.Logger, h *Handlers, resolveUser middleware.UserResolver) http.Handler {
 	r := chi.NewRouter()
 
 	// Global middleware
@@ -69,23 +70,17 @@ func New(cfg *config.Config, log *logger.Logger, h *Handlers) http.Handler {
 		// WebSocket endpoint
 		r.Get("/ws/drifts", h.WebSocket.HandleConnection)
 
-		// Auth endpoints (v1)
-		r.Post("/api/v1/auth/register", h.Auth.Register)
-		r.Post("/api/v1/auth/login", h.Auth.Login)
-		r.Post("/api/v1/auth/refresh", h.Auth.RefreshToken)
-
-		// Auth endpoints (aliases for frontend compatibility)
-		r.Post("/api/auth/register", h.Auth.Register)
-		r.Post("/api/auth/login", h.Auth.Login)
-		r.Post("/api/auth/refresh", h.Auth.RefreshToken)
-		r.Post("/api/login", h.Auth.Login)
-		r.Post("/api/register", h.Auth.Register)
+		// Logout (public so it works even with expired tokens)
 		r.Post("/api/logout", h.Auth.Logout)
+		r.Post("/api/auth/logout", h.Auth.Logout)
 	})
+
+	// Create JWKS key function for Supabase JWT verification (supports HS256 + ES256)
+	kf := auth.NewJWKSKeyFunc(cfg.Supabase.URL, cfg.Supabase.JWTSecret)
 
 	// Protected routes (require authentication)
 	r.Group(func(r chi.Router) {
-		r.Use(middleware.AuthMiddleware(cfg.Auth.JWTSecret))
+		r.Use(middleware.SupabaseAuthMiddleware(kf, resolveUser))
 
 		// Auth
 		r.Get("/api/v1/auth/me", h.Auth.Me)

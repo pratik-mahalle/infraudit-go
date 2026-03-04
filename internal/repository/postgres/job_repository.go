@@ -11,7 +11,7 @@ import (
 	"github.com/pratik-mahalle/infraudit/internal/domain/job"
 )
 
-// JobRepository implements job.Repository for PostgreSQL/SQLite
+// JobRepository implements job.Repository for PostgreSQL
 type JobRepository struct {
 	db *sql.DB
 }
@@ -34,7 +34,7 @@ func (r *JobRepository) CreateJob(ctx context.Context, j *job.ScheduledJob) erro
 
 	query := `
 		INSERT INTO scheduled_jobs (id, user_id, job_type, schedule, is_enabled, config, last_run, next_run, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 	`
 
 	now := time.Now()
@@ -65,7 +65,7 @@ func (r *JobRepository) GetJob(ctx context.Context, id string) (*job.ScheduledJo
 	query := `
 		SELECT id, user_id, job_type, schedule, is_enabled, config, last_run, next_run, created_at, updated_at
 		FROM scheduled_jobs
-		WHERE id = ?
+		WHERE id = $1
 	`
 
 	var j job.ScheduledJob
@@ -112,7 +112,7 @@ func (r *JobRepository) GetJobByUserAndType(ctx context.Context, userID int64, j
 	query := `
 		SELECT id, user_id, job_type, schedule, is_enabled, config, last_run, next_run, created_at, updated_at
 		FROM scheduled_jobs
-		WHERE user_id = ? AND job_type = ?
+		WHERE user_id = $1 AND job_type = $2
 	`
 
 	var j job.ScheduledJob
@@ -163,8 +163,8 @@ func (r *JobRepository) UpdateJob(ctx context.Context, j *job.ScheduledJob) erro
 
 	query := `
 		UPDATE scheduled_jobs
-		SET schedule = ?, is_enabled = ?, config = ?, last_run = ?, next_run = ?, updated_at = ?
-		WHERE id = ?
+		SET schedule = $1, is_enabled = $2, config = $3, last_run = $4, next_run = $5, updated_at = $6
+		WHERE id = $7
 	`
 
 	j.UpdatedAt = time.Now()
@@ -192,7 +192,7 @@ func (r *JobRepository) UpdateJob(ctx context.Context, j *job.ScheduledJob) erro
 
 // DeleteJob deletes a scheduled job
 func (r *JobRepository) DeleteJob(ctx context.Context, id string) error {
-	query := `DELETE FROM scheduled_jobs WHERE id = ?`
+	query := `DELETE FROM scheduled_jobs WHERE id = $1`
 
 	result, err := r.db.ExecContext(ctx, query, id)
 	if err != nil {
@@ -209,23 +209,27 @@ func (r *JobRepository) DeleteJob(ctx context.Context, id string) error {
 
 // ListJobs lists scheduled jobs with filtering
 func (r *JobRepository) ListJobs(ctx context.Context, userID int64, filter job.Filter, limit, offset int) ([]*job.ScheduledJob, int64, error) {
-	query := `
+	paramN := 1
+	query := fmt.Sprintf(`
 		SELECT id, user_id, job_type, schedule, is_enabled, config, last_run, next_run, created_at, updated_at
 		FROM scheduled_jobs
-		WHERE user_id = ?
-	`
-	countQuery := `SELECT COUNT(*) FROM scheduled_jobs WHERE user_id = ?`
+		WHERE user_id = $%d
+	`, paramN)
+	countQuery := fmt.Sprintf(`SELECT COUNT(*) FROM scheduled_jobs WHERE user_id = $%d`, paramN)
 	args := []interface{}{userID}
+	paramN++
 
 	if filter.JobType != "" {
-		query += " AND job_type = ?"
-		countQuery += " AND job_type = ?"
+		query += fmt.Sprintf(" AND job_type = $%d", paramN)
+		countQuery += fmt.Sprintf(" AND job_type = $%d", paramN)
 		args = append(args, string(filter.JobType))
+		paramN++
 	}
 	if filter.IsEnabled != nil {
-		query += " AND is_enabled = ?"
-		countQuery += " AND is_enabled = ?"
+		query += fmt.Sprintf(" AND is_enabled = $%d", paramN)
+		countQuery += fmt.Sprintf(" AND is_enabled = $%d", paramN)
 		args = append(args, *filter.IsEnabled)
+		paramN++
 	}
 
 	var total int64
@@ -234,7 +238,7 @@ func (r *JobRepository) ListJobs(ctx context.Context, userID int64, filter job.F
 		return nil, 0, fmt.Errorf("failed to count scheduled jobs: %w", err)
 	}
 
-	query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
+	query += fmt.Sprintf(" ORDER BY created_at DESC LIMIT $%d OFFSET $%d", paramN, paramN+1)
 	args = append(args, limit, offset)
 
 	rows, err := r.db.QueryContext(ctx, query, args...)
@@ -342,8 +346,8 @@ func (r *JobRepository) GetEnabledJobs(ctx context.Context) ([]*job.ScheduledJob
 func (r *JobRepository) UpdateLastRun(ctx context.Context, id string, lastRun, nextRun interface{}) error {
 	query := `
 		UPDATE scheduled_jobs
-		SET last_run = ?, next_run = ?, updated_at = ?
-		WHERE id = ?
+		SET last_run = $1, next_run = $2, updated_at = $3
+		WHERE id = $4
 	`
 
 	_, err := r.db.ExecContext(ctx, query, lastRun, nextRun, time.Now(), id)
@@ -367,7 +371,7 @@ func (r *JobRepository) CreateExecution(ctx context.Context, e *job.JobExecution
 
 	query := `
 		INSERT INTO job_executions (id, job_id, user_id, job_type, status, started_at, completed_at, duration_ms, result, error_message, retry_count, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 	`
 
 	now := time.Now()
@@ -399,7 +403,7 @@ func (r *JobRepository) GetExecution(ctx context.Context, id string) (*job.JobEx
 	query := `
 		SELECT id, job_id, user_id, job_type, status, started_at, completed_at, duration_ms, result, error_message, retry_count, created_at
 		FROM job_executions
-		WHERE id = ?
+		WHERE id = $1
 	`
 
 	var e job.JobExecution
@@ -453,8 +457,8 @@ func (r *JobRepository) UpdateExecution(ctx context.Context, e *job.JobExecution
 
 	query := `
 		UPDATE job_executions
-		SET status = ?, started_at = ?, completed_at = ?, duration_ms = ?, result = ?, error_message = ?, retry_count = ?
-		WHERE id = ?
+		SET status = $1, started_at = $2, completed_at = $3, duration_ms = $4, result = $5, error_message = $6, retry_count = $7
+		WHERE id = $8
 	`
 
 	_, err = r.db.ExecContext(ctx, query,
@@ -477,6 +481,7 @@ func (r *JobRepository) UpdateExecution(ctx context.Context, e *job.JobExecution
 
 // ListExecutions lists job executions with filtering
 func (r *JobRepository) ListExecutions(ctx context.Context, filter job.ExecutionFilter, limit, offset int) ([]*job.JobExecution, int64, error) {
+	paramN := 1
 	query := `
 		SELECT id, job_id, user_id, job_type, status, started_at, completed_at, duration_ms, result, error_message, retry_count, created_at
 		FROM job_executions
@@ -486,34 +491,40 @@ func (r *JobRepository) ListExecutions(ctx context.Context, filter job.Execution
 	var args []interface{}
 
 	if filter.JobID != "" {
-		query += " AND job_id = ?"
-		countQuery += " AND job_id = ?"
+		query += fmt.Sprintf(" AND job_id = $%d", paramN)
+		countQuery += fmt.Sprintf(" AND job_id = $%d", paramN)
 		args = append(args, filter.JobID)
+		paramN++
 	}
 	if filter.UserID > 0 {
-		query += " AND user_id = ?"
-		countQuery += " AND user_id = ?"
+		query += fmt.Sprintf(" AND user_id = $%d", paramN)
+		countQuery += fmt.Sprintf(" AND user_id = $%d", paramN)
 		args = append(args, filter.UserID)
+		paramN++
 	}
 	if filter.Status != "" {
-		query += " AND status = ?"
-		countQuery += " AND status = ?"
+		query += fmt.Sprintf(" AND status = $%d", paramN)
+		countQuery += fmt.Sprintf(" AND status = $%d", paramN)
 		args = append(args, string(filter.Status))
+		paramN++
 	}
 	if filter.JobType != "" {
-		query += " AND job_type = ?"
-		countQuery += " AND job_type = ?"
+		query += fmt.Sprintf(" AND job_type = $%d", paramN)
+		countQuery += fmt.Sprintf(" AND job_type = $%d", paramN)
 		args = append(args, string(filter.JobType))
+		paramN++
 	}
 	if filter.From != nil {
-		query += " AND started_at >= ?"
-		countQuery += " AND started_at >= ?"
+		query += fmt.Sprintf(" AND started_at >= $%d", paramN)
+		countQuery += fmt.Sprintf(" AND started_at >= $%d", paramN)
 		args = append(args, *filter.From)
+		paramN++
 	}
 	if filter.To != nil {
-		query += " AND started_at <= ?"
-		countQuery += " AND started_at <= ?"
+		query += fmt.Sprintf(" AND started_at <= $%d", paramN)
+		countQuery += fmt.Sprintf(" AND started_at <= $%d", paramN)
 		args = append(args, *filter.To)
+		paramN++
 	}
 
 	var total int64
@@ -522,7 +533,7 @@ func (r *JobRepository) ListExecutions(ctx context.Context, filter job.Execution
 		return nil, 0, fmt.Errorf("failed to count job executions: %w", err)
 	}
 
-	query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
+	query += fmt.Sprintf(" ORDER BY created_at DESC LIMIT $%d OFFSET $%d", paramN, paramN+1)
 	args = append(args, limit, offset)
 
 	rows, err := r.db.QueryContext(ctx, query, args...)
@@ -579,7 +590,7 @@ func (r *JobRepository) GetLatestExecution(ctx context.Context, jobID string) (*
 	query := `
 		SELECT id, job_id, user_id, job_type, status, started_at, completed_at, duration_ms, result, error_message, retry_count, created_at
 		FROM job_executions
-		WHERE job_id = ?
+		WHERE job_id = $1
 		ORDER BY created_at DESC
 		LIMIT 1
 	`
@@ -685,7 +696,7 @@ func (r *JobRepository) GetRunningExecutions(ctx context.Context) ([]*job.JobExe
 
 // CleanupOldExecutions removes executions older than the specified time
 func (r *JobRepository) CleanupOldExecutions(ctx context.Context, olderThan interface{}) (int64, error) {
-	query := `DELETE FROM job_executions WHERE created_at < ?`
+	query := `DELETE FROM job_executions WHERE created_at < $1`
 
 	result, err := r.db.ExecContext(ctx, query, olderThan)
 	if err != nil {

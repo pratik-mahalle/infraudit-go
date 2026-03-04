@@ -9,58 +9,54 @@ import (
 	"github.com/pratik-mahalle/infraudit/internal/testutil"
 )
 
-func TestUserService_Create(t *testing.T) {
+// helper to create a profile directly in the mock repo
+func seedProfile(repo *testutil.MockUserRepository, authID, email string) *user.User {
+	u := &user.User{
+		AuthID:   authID,
+		Email:    email,
+		Username: email,
+		Role:     user.RoleUser,
+		PlanType: user.PlanTypeFree,
+	}
+	_ = repo.Create(context.Background(), u)
+	return u
+}
+
+func TestUserService_EnsureProfile(t *testing.T) {
 	mockRepo := testutil.NewMockUserRepository()
 	log := logger.New(logger.Config{Level: "error", Format: "json"})
 	service := NewUserService(mockRepo, log)
 
-	tests := []struct {
-		name     string
-		email    string
-		password string
-		wantErr  bool
-	}{
-		{
-			name:     "successful user creation",
-			email:    "test@example.com",
-			password: "password123",
-			wantErr:  false,
-		},
-		{
-			name:     "create user with valid email",
-			email:    "user@domain.com",
-			password: "password123",
-			wantErr:  false,
-		},
-	}
+	ctx := context.Background()
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ctx := context.Background()
-			u, err := service.Create(ctx, tt.email, tt.password)
+	t.Run("creates new profile when none exists", func(t *testing.T) {
+		u, err := service.EnsureProfile(ctx, "auth-uuid-1", "new@example.com", "New User")
+		if err != nil {
+			t.Fatalf("EnsureProfile() error = %v", err)
+		}
+		if u == nil {
+			t.Fatal("EnsureProfile() returned nil user")
+		}
+		if u.Email != "new@example.com" {
+			t.Errorf("EnsureProfile() email = %v, want %v", u.Email, "new@example.com")
+		}
+		if u.AuthID != "auth-uuid-1" {
+			t.Errorf("EnsureProfile() authID = %v, want %v", u.AuthID, "auth-uuid-1")
+		}
+		if u.Role != user.RoleUser {
+			t.Errorf("EnsureProfile() role = %v, want %v", u.Role, user.RoleUser)
+		}
+	})
 
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Create() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-
-			if !tt.wantErr {
-				if u == nil {
-					t.Error("Create() returned nil user")
-					return
-				}
-				if u.Email != tt.email {
-					t.Errorf("Create() email = %v, want %v", u.Email, tt.email)
-				}
-				if u.Role != user.RoleUser {
-					t.Errorf("Create() role = %v, want %v", u.Role, user.RoleUser)
-				}
-				if u.PlanType != user.PlanTypeFree {
-					t.Errorf("Create() plan_type = %v, want %v", u.PlanType, user.PlanTypeFree)
-				}
-			}
-		})
-	}
+	t.Run("returns existing profile", func(t *testing.T) {
+		u, err := service.EnsureProfile(ctx, "auth-uuid-1", "new@example.com", "New User")
+		if err != nil {
+			t.Fatalf("EnsureProfile() error = %v", err)
+		}
+		if u.Email != "new@example.com" {
+			t.Errorf("EnsureProfile() should return existing profile")
+		}
+	})
 }
 
 func TestUserService_GetByID(t *testing.T) {
@@ -68,41 +64,51 @@ func TestUserService_GetByID(t *testing.T) {
 	log := logger.New(logger.Config{Level: "error", Format: "json"})
 	service := NewUserService(mockRepo, log)
 
-	// Create a user first
 	ctx := context.Background()
-	createdUser, _ := service.Create(ctx, "test@example.com", "password123")
+	createdUser := seedProfile(mockRepo, "auth-uuid-2", "test@example.com")
 
-	tests := []struct {
-		name    string
-		userID  int64
-		wantErr bool
-	}{
-		{
-			name:    "get existing user",
-			userID:  createdUser.ID,
-			wantErr: false,
-		},
-		{
-			name:    "get non-existing user",
-			userID:  999,
-			wantErr: true,
-		},
-	}
+	t.Run("get existing user", func(t *testing.T) {
+		u, err := service.GetByID(ctx, createdUser.ID)
+		if err != nil {
+			t.Fatalf("GetByID() error = %v", err)
+		}
+		if u == nil {
+			t.Fatal("GetByID() returned nil user")
+		}
+	})
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			u, err := service.GetByID(ctx, tt.userID)
+	t.Run("get non-existing user", func(t *testing.T) {
+		_, err := service.GetByID(ctx, 999)
+		if err == nil {
+			t.Error("GetByID() expected error for non-existing user")
+		}
+	})
+}
 
-			if (err != nil) != tt.wantErr {
-				t.Errorf("GetByID() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
+func TestUserService_GetByAuthID(t *testing.T) {
+	mockRepo := testutil.NewMockUserRepository()
+	log := logger.New(logger.Config{Level: "error", Format: "json"})
+	service := NewUserService(mockRepo, log)
 
-			if !tt.wantErr && u == nil {
-				t.Error("GetByID() returned nil user")
-			}
-		})
-	}
+	ctx := context.Background()
+	seedProfile(mockRepo, "auth-uuid-3", "auth@example.com")
+
+	t.Run("get existing user by auth ID", func(t *testing.T) {
+		u, err := service.GetByAuthID(ctx, "auth-uuid-3")
+		if err != nil {
+			t.Fatalf("GetByAuthID() error = %v", err)
+		}
+		if u.Email != "auth@example.com" {
+			t.Errorf("GetByAuthID() email = %v, want %v", u.Email, "auth@example.com")
+		}
+	})
+
+	t.Run("get non-existing user by auth ID", func(t *testing.T) {
+		_, err := service.GetByAuthID(ctx, "nonexistent-uuid")
+		if err == nil {
+			t.Error("GetByAuthID() expected error for non-existing auth ID")
+		}
+	})
 }
 
 func TestUserService_GetByEmail(t *testing.T) {
@@ -110,48 +116,25 @@ func TestUserService_GetByEmail(t *testing.T) {
 	log := logger.New(logger.Config{Level: "error", Format: "json"})
 	service := NewUserService(mockRepo, log)
 
-	// Create a user first
 	ctx := context.Background()
-	email := "test@example.com"
-	service.Create(ctx, email, "password123")
+	seedProfile(mockRepo, "auth-uuid-4", "email@example.com")
 
-	tests := []struct {
-		name    string
-		email   string
-		wantErr bool
-	}{
-		{
-			name:    "get existing user by email",
-			email:   email,
-			wantErr: false,
-		},
-		{
-			name:    "get non-existing user by email",
-			email:   "nonexistent@example.com",
-			wantErr: true,
-		},
-	}
+	t.Run("get existing user by email", func(t *testing.T) {
+		u, err := service.GetByEmail(ctx, "email@example.com")
+		if err != nil {
+			t.Fatalf("GetByEmail() error = %v", err)
+		}
+		if u.Email != "email@example.com" {
+			t.Errorf("GetByEmail() email = %v, want %v", u.Email, "email@example.com")
+		}
+	})
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			u, err := service.GetByEmail(ctx, tt.email)
-
-			if (err != nil) != tt.wantErr {
-				t.Errorf("GetByEmail() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-
-			if !tt.wantErr {
-				if u == nil {
-					t.Error("GetByEmail() returned nil user")
-					return
-				}
-				if u.Email != tt.email {
-					t.Errorf("GetByEmail() email = %v, want %v", u.Email, tt.email)
-				}
-			}
-		})
-	}
+	t.Run("get non-existing user by email", func(t *testing.T) {
+		_, err := service.GetByEmail(ctx, "nonexistent@example.com")
+		if err == nil {
+			t.Error("GetByEmail() expected error for non-existing email")
+		}
+	})
 }
 
 func TestUserService_Update(t *testing.T) {
@@ -160,17 +143,14 @@ func TestUserService_Update(t *testing.T) {
 	service := NewUserService(mockRepo, log)
 
 	ctx := context.Background()
-	u, _ := service.Create(ctx, "test@example.com", "password123")
+	u := seedProfile(mockRepo, "auth-uuid-5", "update@example.com")
 
-	// Update user
 	u.PlanType = user.PlanTypePro
 	err := service.Update(ctx, u)
-
 	if err != nil {
-		t.Errorf("Update() error = %v", err)
+		t.Fatalf("Update() error = %v", err)
 	}
 
-	// Verify update
 	updated, _ := service.GetByID(ctx, u.ID)
 	if updated.PlanType != user.PlanTypePro {
 		t.Errorf("Update() plan_type = %v, want %v", updated.PlanType, user.PlanTypePro)
@@ -183,7 +163,7 @@ func TestUserService_UpgradePlan(t *testing.T) {
 	service := NewUserService(mockRepo, log)
 
 	ctx := context.Background()
-	u, _ := service.Create(ctx, "test@example.com", "password123")
+	u := seedProfile(mockRepo, "auth-uuid-6", "upgrade@example.com")
 
 	tests := []struct {
 		name     string
@@ -191,35 +171,17 @@ func TestUserService_UpgradePlan(t *testing.T) {
 		planType string
 		wantErr  bool
 	}{
-		{
-			name:     "upgrade to premium",
-			userID:   u.ID,
-			planType: user.PlanTypePro,
-			wantErr:  false,
-		},
-		{
-			name:     "upgrade to enterprise",
-			userID:   u.ID,
-			planType: user.PlanTypeEnterprise,
-			wantErr:  false,
-		},
-		{
-			name:     "upgrade non-existing user",
-			userID:   999,
-			planType: user.PlanTypePro,
-			wantErr:  true,
-		},
+		{"upgrade to pro", u.ID, user.PlanTypePro, false},
+		{"upgrade to enterprise", u.ID, user.PlanTypeEnterprise, false},
+		{"upgrade non-existing user", 999, user.PlanTypePro, true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := service.UpgradePlan(ctx, tt.userID, tt.planType)
-
 			if (err != nil) != tt.wantErr {
 				t.Errorf("UpgradePlan() error = %v, wantErr %v", err, tt.wantErr)
-				return
 			}
-
 			if !tt.wantErr {
 				updated, _ := service.GetByID(ctx, tt.userID)
 				if updated.PlanType != tt.planType {
@@ -227,33 +189,5 @@ func TestUserService_UpgradePlan(t *testing.T) {
 				}
 			}
 		})
-	}
-}
-
-func TestUserService_GetTrialStatus(t *testing.T) {
-	mockRepo := testutil.NewMockUserRepository()
-	log := logger.New(logger.Config{Level: "error", Format: "json"})
-	service := NewUserService(mockRepo, log)
-
-	ctx := context.Background()
-	u, _ := service.Create(ctx, "test@example.com", "password123")
-
-	// Set user to trial
-	u.PlanType = user.PlanTypeTrial
-	service.Update(ctx, u)
-
-	status, err := service.GetTrialStatus(ctx, u.ID)
-
-	if err != nil {
-		t.Errorf("GetTrialStatus() error = %v", err)
-	}
-
-	if status == nil {
-		t.Error("GetTrialStatus() returned nil status")
-		return
-	}
-
-	if status.Status != "active" {
-		t.Errorf("GetTrialStatus() status = %v, want %v", status.Status, "active")
 	}
 }

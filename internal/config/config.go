@@ -14,11 +14,20 @@ type Config struct {
 	Server   ServerConfig
 	Database DatabaseConfig
 	Auth     AuthConfig
+	Supabase SupabaseConfig
 	OAuth    OAuthConfig
 	Redis    RedisConfig
 	Logging  LoggingConfig
 	Provider ProviderConfig
 	Scanner  ScannerConfig
+}
+
+// SupabaseConfig contains Supabase integration configuration
+type SupabaseConfig struct {
+	URL            string
+	AnonKey        string
+	ServiceRoleKey string
+	JWTSecret      string
 }
 
 // ServerConfig contains HTTP server configuration
@@ -142,11 +151,17 @@ func Load() (*Config, error) {
 			Path:            getEnv("DB_PATH", "./data.db"),
 		},
 		Auth: AuthConfig{
-			JWTSecret:          getEnv("JWT_SECRET", "supersecretkey"),
+			JWTSecret:          getEnv("JWT_SECRET", ""),
 			AccessTokenExpiry:  getEnvAsDuration("JWT_ACCESS_EXPIRY", 15*time.Minute),
 			RefreshTokenExpiry: getEnvAsDuration("JWT_REFRESH_EXPIRY", 7*24*time.Hour),
 			BCryptCost:         getEnvAsInt("BCRYPT_COST", 12),
 			SessionSecret:      getEnv("SESSION_SECRET", "session-secret-key"),
+		},
+		Supabase: SupabaseConfig{
+			URL:            getEnv("SUPABASE_URL", ""),
+			AnonKey:        getEnv("SUPABASE_ANON_KEY", ""),
+			ServiceRoleKey: getEnv("SUPABASE_SERVICE_ROLE_KEY", ""),
+			JWTSecret:      getEnv("SUPABASE_JWT_SECRET", ""),
 		},
 		OAuth: OAuthConfig{
 			Google: GoogleOAuthConfig{
@@ -195,8 +210,12 @@ func Load() (*Config, error) {
 
 // Validate validates the configuration
 func (c *Config) Validate() error {
-	if c.Auth.JWTSecret == "" || c.Auth.JWTSecret == "supersecretkey" {
-		return fmt.Errorf("JWT_SECRET must be set and should not use default value in production")
+	if c.Supabase.JWTSecret == "" {
+		return fmt.Errorf("SUPABASE_JWT_SECRET must be set")
+	}
+
+	if c.Supabase.URL == "" {
+		return fmt.Errorf("SUPABASE_URL must be set")
 	}
 
 	if c.Server.Port < 1 || c.Server.Port > 65535 {
