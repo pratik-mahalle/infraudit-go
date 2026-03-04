@@ -24,22 +24,22 @@ func (r *AnomalyRepository) Create(ctx context.Context, a *anomaly.Anomaly) (int
 	a.CreatedAt = now
 	a.DetectedAt = now
 
-	query := `INSERT INTO cost_anomalies (user_id, resource_id, anomaly_type, severity, percentage, previous_cost, current_cost, detected_at, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	query := `INSERT INTO cost_anomalies (user_id, resource_id, anomaly_type, severity, percentage, previous_cost, current_cost, detected_at, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`
 
-	result, err := r.db.ExecContext(ctx, query, a.UserID, a.ResourceID, a.AnomalyType, a.Severity, a.Percentage, a.PreviousCost, a.CurrentCost, now.Format(time.RFC3339), a.Status)
+	var id int64
+	err := r.db.QueryRowContext(ctx, query, a.UserID, a.ResourceID, a.AnomalyType, a.Severity, a.Percentage, a.PreviousCost, a.CurrentCost, now, a.Status).Scan(&id)
 	if err != nil {
 		return 0, errors.DatabaseError("Failed to create anomaly", err)
 	}
 
-	return result.LastInsertId()
+	return id, nil
 }
 
 func (r *AnomalyRepository) GetByID(ctx context.Context, userID int64, id int64) (*anomaly.Anomaly, error) {
-	query := `SELECT id, user_id, resource_id, anomaly_type, severity, percentage, previous_cost, current_cost, detected_at, status FROM cost_anomalies WHERE user_id = ? AND id = ?`
+	query := `SELECT id, user_id, resource_id, anomaly_type, severity, percentage, previous_cost, current_cost, detected_at, status FROM cost_anomalies WHERE user_id = $1 AND id = $2`
 
 	var a anomaly.Anomaly
-	var detectedAt string
-	err := r.db.QueryRowContext(ctx, query, userID, id).Scan(&a.ID, &a.UserID, &a.ResourceID, &a.AnomalyType, &a.Severity, &a.Percentage, &a.PreviousCost, &a.CurrentCost, &detectedAt, &a.Status)
+	err := r.db.QueryRowContext(ctx, query, userID, id).Scan(&a.ID, &a.UserID, &a.ResourceID, &a.AnomalyType, &a.Severity, &a.Percentage, &a.PreviousCost, &a.CurrentCost, &a.DetectedAt, &a.Status)
 
 	if err == sql.ErrNoRows {
 		return nil, errors.NotFound("Anomaly")
@@ -48,13 +48,12 @@ func (r *AnomalyRepository) GetByID(ctx context.Context, userID int64, id int64)
 		return nil, errors.DatabaseError("Failed to get anomaly", err)
 	}
 
-	a.DetectedAt, _ = time.Parse(time.RFC3339, detectedAt)
 	return &a, nil
 }
 
 func (r *AnomalyRepository) Update(ctx context.Context, a *anomaly.Anomaly) error {
 	a.UpdatedAt = time.Now()
-	query := `UPDATE cost_anomalies SET resource_id = ?, anomaly_type = ?, severity = ?, percentage = ?, previous_cost = ?, current_cost = ?, status = ? WHERE user_id = ? AND id = ?`
+	query := `UPDATE cost_anomalies SET resource_id = $1, anomaly_type = $2, severity = $3, percentage = $4, previous_cost = $5, current_cost = $6, status = $7 WHERE user_id = $8 AND id = $9`
 
 	result, err := r.db.ExecContext(ctx, query, a.ResourceID, a.AnomalyType, a.Severity, a.Percentage, a.PreviousCost, a.CurrentCost, a.Status, a.UserID, a.ID)
 	if err != nil {
@@ -70,7 +69,7 @@ func (r *AnomalyRepository) Update(ctx context.Context, a *anomaly.Anomaly) erro
 }
 
 func (r *AnomalyRepository) Delete(ctx context.Context, userID int64, id int64) error {
-	result, err := r.db.ExecContext(ctx, "DELETE FROM cost_anomalies WHERE user_id = ? AND id = ?", userID, id)
+	result, err := r.db.ExecContext(ctx, "DELETE FROM cost_anomalies WHERE user_id = $1 AND id = $2", userID, id)
 	if err != nil {
 		return errors.DatabaseError("Failed to delete anomaly", err)
 	}
@@ -84,24 +83,30 @@ func (r *AnomalyRepository) Delete(ctx context.Context, userID int64, id int64) 
 }
 
 func (r *AnomalyRepository) List(ctx context.Context, userID int64, filter anomaly.Filter) ([]*anomaly.Anomaly, error) {
-	where := []string{"user_id = ?"}
+	paramN := 1
+	where := []string{fmt.Sprintf("user_id = $%d", paramN)}
 	args := []interface{}{userID}
+	paramN++
 
 	if filter.ResourceID != "" {
-		where = append(where, "resource_id = ?")
+		where = append(where, fmt.Sprintf("resource_id = $%d", paramN))
 		args = append(args, filter.ResourceID)
+		paramN++
 	}
 	if filter.Type != "" {
-		where = append(where, "anomaly_type = ?")
+		where = append(where, fmt.Sprintf("anomaly_type = $%d", paramN))
 		args = append(args, filter.Type)
+		paramN++
 	}
 	if filter.Severity != "" {
-		where = append(where, "severity = ?")
+		where = append(where, fmt.Sprintf("severity = $%d", paramN))
 		args = append(args, filter.Severity)
+		paramN++
 	}
 	if filter.Status != "" {
-		where = append(where, "status = ?")
+		where = append(where, fmt.Sprintf("status = $%d", paramN))
 		args = append(args, filter.Status)
+		paramN++
 	}
 
 	query := fmt.Sprintf(`SELECT id, user_id, resource_id, anomaly_type, severity, percentage, previous_cost, current_cost, detected_at, status FROM cost_anomalies WHERE %s ORDER BY id DESC`, strings.Join(where, " AND "))
@@ -116,12 +121,10 @@ func (r *AnomalyRepository) List(ctx context.Context, userID int64, filter anoma
 	anomalies := make([]*anomaly.Anomaly, 0, 100)
 	for rows.Next() {
 		var a anomaly.Anomaly
-		var detectedAt string
-		err := rows.Scan(&a.ID, &a.UserID, &a.ResourceID, &a.AnomalyType, &a.Severity, &a.Percentage, &a.PreviousCost, &a.CurrentCost, &detectedAt, &a.Status)
+		err := rows.Scan(&a.ID, &a.UserID, &a.ResourceID, &a.AnomalyType, &a.Severity, &a.Percentage, &a.PreviousCost, &a.CurrentCost, &a.DetectedAt, &a.Status)
 		if err != nil {
 			return nil, errors.DatabaseError("Failed to scan anomaly", err)
 		}
-		a.DetectedAt, _ = time.Parse(time.RFC3339, detectedAt)
 		anomalies = append(anomalies, &a)
 	}
 
@@ -129,16 +132,20 @@ func (r *AnomalyRepository) List(ctx context.Context, userID int64, filter anoma
 }
 
 func (r *AnomalyRepository) ListWithPagination(ctx context.Context, userID int64, filter anomaly.Filter, limit, offset int) ([]*anomaly.Anomaly, int64, error) {
-	where := []string{"user_id = ?"}
+	paramN := 1
+	where := []string{fmt.Sprintf("user_id = $%d", paramN)}
 	args := []interface{}{userID}
+	paramN++
 
 	if filter.ResourceID != "" {
-		where = append(where, "resource_id = ?")
+		where = append(where, fmt.Sprintf("resource_id = $%d", paramN))
 		args = append(args, filter.ResourceID)
+		paramN++
 	}
 	if filter.Severity != "" {
-		where = append(where, "severity = ?")
+		where = append(where, fmt.Sprintf("severity = $%d", paramN))
 		args = append(args, filter.Severity)
+		paramN++
 	}
 
 	whereClause := strings.Join(where, " AND ")
@@ -149,7 +156,7 @@ func (r *AnomalyRepository) ListWithPagination(ctx context.Context, userID int64
 		return nil, 0, errors.DatabaseError("Failed to count anomalies", err)
 	}
 
-	query := fmt.Sprintf(`SELECT id, user_id, resource_id, anomaly_type, severity, percentage, previous_cost, current_cost, detected_at, status FROM cost_anomalies WHERE %s ORDER BY id DESC LIMIT ? OFFSET ?`, whereClause)
+	query := fmt.Sprintf(`SELECT id, user_id, resource_id, anomaly_type, severity, percentage, previous_cost, current_cost, detected_at, status FROM cost_anomalies WHERE %s ORDER BY id DESC LIMIT $%d OFFSET $%d`, whereClause, paramN, paramN+1)
 
 	args = append(args, limit, offset)
 	rows, err := r.db.QueryContext(ctx, query, args...)
@@ -162,12 +169,10 @@ func (r *AnomalyRepository) ListWithPagination(ctx context.Context, userID int64
 	anomalies := make([]*anomaly.Anomaly, 0, limit)
 	for rows.Next() {
 		var a anomaly.Anomaly
-		var detectedAt string
-		err := rows.Scan(&a.ID, &a.UserID, &a.ResourceID, &a.AnomalyType, &a.Severity, &a.Percentage, &a.PreviousCost, &a.CurrentCost, &detectedAt, &a.Status)
+		err := rows.Scan(&a.ID, &a.UserID, &a.ResourceID, &a.AnomalyType, &a.Severity, &a.Percentage, &a.PreviousCost, &a.CurrentCost, &a.DetectedAt, &a.Status)
 		if err != nil {
 			return nil, 0, errors.DatabaseError("Failed to scan anomaly", err)
 		}
-		a.DetectedAt, _ = time.Parse(time.RFC3339, detectedAt)
 		anomalies = append(anomalies, &a)
 	}
 
@@ -175,7 +180,7 @@ func (r *AnomalyRepository) ListWithPagination(ctx context.Context, userID int64
 }
 
 func (r *AnomalyRepository) CountBySeverity(ctx context.Context, userID int64) (map[string]int, error) {
-	query := `SELECT severity, COUNT(*) FROM cost_anomalies WHERE user_id = ? GROUP BY severity`
+	query := `SELECT severity, COUNT(*) FROM cost_anomalies WHERE user_id = $1 GROUP BY severity`
 
 	rows, err := r.db.QueryContext(ctx, query, userID)
 	if err != nil {

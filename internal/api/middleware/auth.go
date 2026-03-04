@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -18,10 +19,17 @@ const (
 	UserIDKey ContextKey = "userID"
 	// UserEmailKey is the context key for user email
 	UserEmailKey ContextKey = "email"
+	// AuthIDKey is the context key for Supabase auth UUID
+	AuthIDKey ContextKey = "authID"
 )
 
-// AuthMiddleware returns a middleware that validates JWT tokens
-func AuthMiddleware(jwtSecret string) func(http.Handler) http.Handler {
+// UserResolver resolves a Supabase auth UUID to an internal user ID (int64)
+type UserResolver func(ctx context.Context, authID string) (int64, error)
+
+// SupabaseAuthMiddleware returns a middleware that validates Supabase JWT tokens
+// and resolves the Supabase user UUID to an internal integer user ID.
+// It supports both HS256 and ES256 (JWKS) token verification.
+func SupabaseAuthMiddleware(kf *auth.JWKSKeyFunc, resolveUser UserResolver) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Try to get token from Authorization header
@@ -47,28 +55,39 @@ func AuthMiddleware(jwtSecret string) func(http.Handler) http.Handler {
 				return
 			}
 
-			// Parse and validate token
-			claims, err := auth.ParseClaims(tokenStr, jwtSecret)
+			// Parse and validate Supabase JWT (supports HS256 + ES256)
+			claims, err := auth.ParseSupabaseClaims(tokenStr, kf)
 			if err != nil {
+				fmt.Printf("[AUTH DEBUG] JWT parse error: %v\n", err)
 				utils.WriteError(w, errors.Unauthorized("Invalid or expired token"))
 				return
 			}
 
-			// Add user info to context
-			ctx := context.WithValue(r.Context(), UserIDKey, claims.UserID)
+			// Resolve Supabase UUID to internal user ID
+			userID, err := resolveUser(r.Context(), claims.Sub)
+			if err != nil {
+				fmt.Printf("[AUTH DEBUG] User resolve error for sub=%s: %v\n", claims.Sub, err)
+				utils.WriteError(w, errors.Unauthorized("User profile not found"))
+				return
+			}
+
+			// Add user info to context (int64 userID for backward compatibility)
+			ctx := context.WithValue(r.Context(), UserIDKey, userID)
 			ctx = context.WithValue(ctx, UserEmailKey, claims.Email)
+			ctx = context.WithValue(ctx, AuthIDKey, claims.Sub)
 
 			// Add audit info to logs
-			AddLogField(w, "user_id", claims.UserID)
+			AddLogField(w, "user_id", userID)
 			AddLogField(w, "email", claims.Email)
+			AddLogField(w, "auth_id", claims.Sub)
 
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
 }
 
-// OptionalAuthMiddleware is like AuthMiddleware but doesn't reject requests without tokens
-func OptionalAuthMiddleware(jwtSecret string) func(http.Handler) http.Handler {
+// OptionalSupabaseAuthMiddleware is like SupabaseAuthMiddleware but doesn't reject requests without tokens
+func OptionalSupabaseAuthMiddleware(kf *auth.JWKSKeyFunc, resolveUser UserResolver) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Try to get token from Authorization header
@@ -88,16 +107,20 @@ func OptionalAuthMiddleware(jwtSecret string) func(http.Handler) http.Handler {
 			}
 
 			if tokenStr != "" {
-				claims, err := auth.ParseClaims(tokenStr, jwtSecret)
+				claims, err := auth.ParseSupabaseClaims(tokenStr, kf)
 				if err == nil {
-					ctx := context.WithValue(r.Context(), UserIDKey, claims.UserID)
-					ctx = context.WithValue(ctx, UserEmailKey, claims.Email)
+					userID, err := resolveUser(r.Context(), claims.Sub)
+					if err == nil {
+						ctx := context.WithValue(r.Context(), UserIDKey, userID)
+						ctx = context.WithValue(ctx, UserEmailKey, claims.Email)
+						ctx = context.WithValue(ctx, AuthIDKey, claims.Sub)
 
-					// Add audit info to logs
-					AddLogField(w, "user_id", claims.UserID)
-					AddLogField(w, "email", claims.Email)
+						AddLogField(w, "user_id", userID)
+						AddLogField(w, "email", claims.Email)
+						AddLogField(w, "auth_id", claims.Sub)
 
-					r = r.WithContext(ctx)
+						r = r.WithContext(ctx)
+					}
 				}
 			}
 
@@ -116,4 +139,10 @@ func GetUserID(r *http.Request) (int64, bool) {
 func GetUserEmail(r *http.Request) (string, bool) {
 	email, ok := r.Context().Value(UserEmailKey).(string)
 	return email, ok
+}
+
+// GetAuthID extracts the Supabase auth UUID from the request context
+func GetAuthID(r *http.Request) (string, bool) {
+	authID, ok := r.Context().Value(AuthIDKey).(string)
+	return authID, ok
 }

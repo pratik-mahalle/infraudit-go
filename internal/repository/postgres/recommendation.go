@@ -34,23 +34,25 @@ func (r *RecommendationRepository) Create(ctx context.Context, rec *recommendati
 
 	query := `
 		INSERT INTO recommendations (user_id, type, priority, title, description, savings, effort, impact, category, status, resources)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		RETURNING id
 	`
 
-	result, err := r.db.ExecContext(ctx, query,
+	var id int64
+	err := r.db.QueryRowContext(ctx, query,
 		rec.UserID, rec.Type, rec.Priority, rec.Title, rec.Description, rec.Savings, rec.Effort, rec.Impact, rec.Category, status, string(resourcesJSON),
-	)
+	).Scan(&id)
 	if err != nil {
 		return 0, errors.DatabaseError("Failed to create recommendation", err)
 	}
 
-	return result.LastInsertId()
+	return id, nil
 }
 
 func (r *RecommendationRepository) GetByID(ctx context.Context, userID int64, id int64) (*recommendation.Recommendation, error) {
 	query := `
 		SELECT id, user_id, type, priority, title, description, savings, effort, impact, category, status, resources
-		FROM recommendations WHERE user_id = ? AND id = ?
+		FROM recommendations WHERE user_id = $1 AND id = $2
 	`
 
 	var rec recommendation.Recommendation
@@ -80,8 +82,8 @@ func (r *RecommendationRepository) Update(ctx context.Context, rec *recommendati
 	}
 
 	query := `
-		UPDATE recommendations SET type = ?, priority = ?, title = ?, description = ?, savings = ?, effort = ?, impact = ?, category = ?, status = ?, resources = ?
-		WHERE user_id = ? AND id = ?
+		UPDATE recommendations SET type = $1, priority = $2, title = $3, description = $4, savings = $5, effort = $6, impact = $7, category = $8, status = $9, resources = $10
+		WHERE user_id = $11 AND id = $12
 	`
 
 	result, err := r.db.ExecContext(ctx, query,
@@ -100,7 +102,7 @@ func (r *RecommendationRepository) Update(ctx context.Context, rec *recommendati
 }
 
 func (r *RecommendationRepository) Delete(ctx context.Context, userID int64, id int64) error {
-	result, err := r.db.ExecContext(ctx, "DELETE FROM recommendations WHERE user_id = ? AND id = ?", userID, id)
+	result, err := r.db.ExecContext(ctx, "DELETE FROM recommendations WHERE user_id = $1 AND id = $2", userID, id)
 	if err != nil {
 		return errors.DatabaseError("Failed to delete recommendation", err)
 	}
@@ -114,24 +116,30 @@ func (r *RecommendationRepository) Delete(ctx context.Context, userID int64, id 
 }
 
 func (r *RecommendationRepository) List(ctx context.Context, userID int64, filter recommendation.Filter) ([]*recommendation.Recommendation, error) {
-	where := []string{"user_id = ?"}
+	paramN := 1
+	where := []string{fmt.Sprintf("user_id = $%d", paramN)}
 	args := []interface{}{userID}
+	paramN++
 
 	if filter.Type != "" {
-		where = append(where, "type = ?")
+		where = append(where, fmt.Sprintf("type = $%d", paramN))
 		args = append(args, filter.Type)
+		paramN++
 	}
 	if filter.Priority != "" {
-		where = append(where, "priority = ?")
+		where = append(where, fmt.Sprintf("priority = $%d", paramN))
 		args = append(args, filter.Priority)
+		paramN++
 	}
 	if filter.Category != "" {
-		where = append(where, "category = ?")
+		where = append(where, fmt.Sprintf("category = $%d", paramN))
 		args = append(args, filter.Category)
+		paramN++
 	}
 	if filter.Status != "" {
-		where = append(where, "status = ?")
+		where = append(where, fmt.Sprintf("status = $%d", paramN))
 		args = append(args, filter.Status)
+		paramN++
 	}
 
 	query := fmt.Sprintf(`
@@ -162,20 +170,25 @@ func (r *RecommendationRepository) List(ctx context.Context, userID int64, filte
 }
 
 func (r *RecommendationRepository) ListWithPagination(ctx context.Context, userID int64, filter recommendation.Filter, limit, offset int) ([]*recommendation.Recommendation, int64, error) {
-	where := []string{"user_id = ?"}
+	paramN := 1
+	where := []string{fmt.Sprintf("user_id = $%d", paramN)}
 	args := []interface{}{userID}
+	paramN++
 
 	if filter.Type != "" {
-		where = append(where, "type = ?")
+		where = append(where, fmt.Sprintf("type = $%d", paramN))
 		args = append(args, filter.Type)
+		paramN++
 	}
 	if filter.Priority != "" {
-		where = append(where, "priority = ?")
+		where = append(where, fmt.Sprintf("priority = $%d", paramN))
 		args = append(args, filter.Priority)
+		paramN++
 	}
 	if filter.Status != "" {
-		where = append(where, "status = ?")
+		where = append(where, fmt.Sprintf("status = $%d", paramN))
 		args = append(args, filter.Status)
+		paramN++
 	}
 
 	whereClause := strings.Join(where, " AND ")
@@ -192,8 +205,8 @@ func (r *RecommendationRepository) ListWithPagination(ctx context.Context, userI
 
 	query := fmt.Sprintf(`
 		SELECT id, user_id, type, priority, title, description, savings, effort, impact, category, status, resources
-		FROM recommendations WHERE %s ORDER BY id DESC LIMIT ? OFFSET ?
-	`, whereClause)
+		FROM recommendations WHERE %s ORDER BY id DESC LIMIT $%d OFFSET $%d
+	`, whereClause, paramN, paramN+1)
 
 	args = append(args, limit, offset)
 	rows, err := r.db.QueryContext(ctx, query, args...)
@@ -220,7 +233,7 @@ func (r *RecommendationRepository) ListWithPagination(ctx context.Context, userI
 
 func (r *RecommendationRepository) GetTotalSavings(ctx context.Context, userID int64) (float64, error) {
 	var total float64
-	err := r.db.QueryRowContext(ctx, "SELECT COALESCE(SUM(savings), 0) FROM recommendations WHERE user_id = ?", userID).Scan(&total)
+	err := r.db.QueryRowContext(ctx, "SELECT COALESCE(SUM(savings), 0) FROM recommendations WHERE user_id = $1", userID).Scan(&total)
 	if err != nil {
 		return 0, errors.DatabaseError("Failed to get total savings", err)
 	}

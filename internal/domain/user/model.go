@@ -4,15 +4,16 @@ import "time"
 
 // User represents a user in the system
 type User struct {
-	ID           int64     `json:"id"`
-	Email        string    `json:"email"`
-	Username     string    `json:"username,omitempty"`
-	FullName     *string   `json:"full_name,omitempty"`
-	PasswordHash string    `json:"-"` // Not exposed in JSON
-	Role         string    `json:"role"`
-	PlanType     string    `json:"plan_type"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	ID        int64     `json:"id"`
+	AuthID    string    `json:"auth_id,omitempty"` // Supabase auth.users UUID
+	Email     string    `json:"email"`
+	Username  string    `json:"username,omitempty"`
+	FullName  *string   `json:"full_name,omitempty"`
+	AvatarURL string    `json:"avatar_url,omitempty"`
+	Role      string    `json:"role"`
+	PlanType  string    `json:"plan_type"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // Plan types

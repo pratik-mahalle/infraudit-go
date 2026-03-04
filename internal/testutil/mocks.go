@@ -20,6 +20,7 @@ import (
 type MockUserRepository struct {
 	Users       map[int64]*user.User
 	EmailIndex  map[string]*user.User
+	AuthIndex   map[string]*user.User
 	NextID      int64
 	CreateError error
 	GetError    error
@@ -30,6 +31,7 @@ func NewMockUserRepository() *MockUserRepository {
 	return &MockUserRepository{
 		Users:      make(map[int64]*user.User),
 		EmailIndex: make(map[string]*user.User),
+		AuthIndex:  make(map[string]*user.User),
 		NextID:     1,
 	}
 }
@@ -42,6 +44,9 @@ func (m *MockUserRepository) Create(ctx context.Context, u *user.User) error {
 	m.NextID++
 	m.Users[u.ID] = u
 	m.EmailIndex[u.Email] = u
+	if u.AuthID != "" {
+		m.AuthIndex[u.AuthID] = u
+	}
 	return nil
 }
 
@@ -54,6 +59,25 @@ func (m *MockUserRepository) GetByID(ctx context.Context, id int64) (*user.User,
 		return nil, fmt.Errorf("user not found")
 	}
 	return u, nil
+}
+
+func (m *MockUserRepository) GetByAuthID(ctx context.Context, authID string) (*user.User, error) {
+	if m.GetError != nil {
+		return nil, m.GetError
+	}
+	u, ok := m.AuthIndex[authID]
+	if !ok {
+		return nil, fmt.Errorf("user not found")
+	}
+	return u, nil
+}
+
+func (m *MockUserRepository) ResolveAuthID(ctx context.Context, authID string) (int64, error) {
+	u, err := m.GetByAuthID(ctx, authID)
+	if err != nil {
+		return 0, err
+	}
+	return u.ID, nil
 }
 
 func (m *MockUserRepository) GetByEmail(ctx context.Context, email string) (*user.User, error) {
@@ -76,12 +100,18 @@ func (m *MockUserRepository) Update(ctx context.Context, u *user.User) error {
 	}
 	m.Users[u.ID] = u
 	m.EmailIndex[u.Email] = u
+	if u.AuthID != "" {
+		m.AuthIndex[u.AuthID] = u
+	}
 	return nil
 }
 
 func (m *MockUserRepository) Delete(ctx context.Context, id int64) error {
 	if u, ok := m.Users[id]; ok {
 		delete(m.EmailIndex, u.Email)
+		if u.AuthID != "" {
+			delete(m.AuthIndex, u.AuthID)
+		}
 		delete(m.Users, id)
 	}
 	return nil

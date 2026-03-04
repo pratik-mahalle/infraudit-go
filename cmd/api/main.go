@@ -207,7 +207,7 @@ func main() {
 	// Initialize handlers
 	handlers := &router.Handlers{
 		Health:         handlers.NewHealthHandler(db, log),
-		Auth:           handlers.NewAuthHandler(userService, cfg, log, val),
+		Auth:           handlers.NewAuthHandler(userService, log),
 		Resource:       handlers.NewResourceHandler(resourceService, log, val),
 		Provider:       handlers.NewProviderHandler(providerService, log, val),
 		Alert:          handlers.NewAlertHandler(alertService, log, val),
@@ -227,8 +227,8 @@ func main() {
 		Analysis:       handlers.NewAnalysisHandler(geminiClient, log),
 	}
 
-	// Setup router
-	r := router.New(cfg, log, handlers)
+	// Setup router with Supabase auth resolver
+	r := router.New(cfg, log, handlers, userRepo.ResolveAuthID)
 
 	// Create HTTP server
 	srv := &http.Server{

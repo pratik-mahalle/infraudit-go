@@ -26,19 +26,16 @@ func (r *AlertRepository) Create(ctx context.Context, a *alert.Alert) (int64, er
 
 	query := `
 		INSERT INTO alerts (user_id, type, severity, title, description, resource, status, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		RETURNING id
 	`
 
-	result, err := r.db.ExecContext(ctx, query,
-		a.UserID, a.Type, a.Severity, a.Title, a.Description, a.Resource, a.Status, now.Format(time.RFC3339),
-	)
+	var id int64
+	err := r.db.QueryRowContext(ctx, query,
+		a.UserID, a.Type, a.Severity, a.Title, a.Description, a.Resource, a.Status, now,
+	).Scan(&id)
 	if err != nil {
 		return 0, errors.DatabaseError("Failed to create alert", err)
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		return 0, errors.DatabaseError("Failed to get alert ID", err)
 	}
 
 	return id, nil
@@ -47,13 +44,12 @@ func (r *AlertRepository) Create(ctx context.Context, a *alert.Alert) (int64, er
 func (r *AlertRepository) GetByID(ctx context.Context, userID int64, id int64) (*alert.Alert, error) {
 	query := `
 		SELECT id, user_id, type, severity, title, description, resource, status, created_at
-		FROM alerts WHERE user_id = ? AND id = ?
+		FROM alerts WHERE user_id = $1 AND id = $2
 	`
 
 	var a alert.Alert
-	var timestamp string
 	err := r.db.QueryRowContext(ctx, query, userID, id).Scan(
-		&a.ID, &a.UserID, &a.Type, &a.Severity, &a.Title, &a.Description, &a.Resource, &a.Status, &timestamp,
+		&a.ID, &a.UserID, &a.Type, &a.Severity, &a.Title, &a.Description, &a.Resource, &a.Status, &a.CreatedAt,
 	)
 
 	if err == sql.ErrNoRows {
@@ -63,7 +59,6 @@ func (r *AlertRepository) GetByID(ctx context.Context, userID int64, id int64) (
 		return nil, errors.DatabaseError("Failed to get alert", err)
 	}
 
-	a.CreatedAt, _ = time.Parse(time.RFC3339, timestamp)
 	return &a, nil
 }
 
@@ -71,8 +66,8 @@ func (r *AlertRepository) Update(ctx context.Context, a *alert.Alert) error {
 	a.UpdatedAt = time.Now()
 
 	query := `
-		UPDATE alerts SET type = ?, severity = ?, title = ?, description = ?, resource = ?, status = ?
-		WHERE user_id = ? AND id = ?
+		UPDATE alerts SET type = $1, severity = $2, title = $3, description = $4, resource = $5, status = $6
+		WHERE user_id = $7 AND id = $8
 	`
 
 	result, err := r.db.ExecContext(ctx, query,
@@ -94,7 +89,7 @@ func (r *AlertRepository) Update(ctx context.Context, a *alert.Alert) error {
 }
 
 func (r *AlertRepository) Delete(ctx context.Context, userID int64, id int64) error {
-	result, err := r.db.ExecContext(ctx, "DELETE FROM alerts WHERE user_id = ? AND id = ?", userID, id)
+	result, err := r.db.ExecContext(ctx, "DELETE FROM alerts WHERE user_id = $1 AND id = $2", userID, id)
 	if err != nil {
 		return errors.DatabaseError("Failed to delete alert", err)
 	}
@@ -111,24 +106,30 @@ func (r *AlertRepository) Delete(ctx context.Context, userID int64, id int64) er
 }
 
 func (r *AlertRepository) List(ctx context.Context, userID int64, filter alert.Filter) ([]*alert.Alert, error) {
-	where := []string{"user_id = ?"}
+	paramN := 1
+	where := []string{fmt.Sprintf("user_id = $%d", paramN)}
 	args := []interface{}{userID}
+	paramN++
 
 	if filter.Type != "" {
-		where = append(where, "type = ?")
+		where = append(where, fmt.Sprintf("type = $%d", paramN))
 		args = append(args, filter.Type)
+		paramN++
 	}
 	if filter.Severity != "" {
-		where = append(where, "severity = ?")
+		where = append(where, fmt.Sprintf("severity = $%d", paramN))
 		args = append(args, filter.Severity)
+		paramN++
 	}
 	if filter.Status != "" {
-		where = append(where, "status = ?")
+		where = append(where, fmt.Sprintf("status = $%d", paramN))
 		args = append(args, filter.Status)
+		paramN++
 	}
 	if filter.Resource != "" {
-		where = append(where, "resource = ?")
+		where = append(where, fmt.Sprintf("resource = $%d", paramN))
 		args = append(args, filter.Resource)
+		paramN++
 	}
 
 	query := fmt.Sprintf(`
@@ -146,12 +147,10 @@ func (r *AlertRepository) List(ctx context.Context, userID int64, filter alert.F
 	alerts := make([]*alert.Alert, 0, 100)
 	for rows.Next() {
 		var a alert.Alert
-		var timestamp string
-		err := rows.Scan(&a.ID, &a.UserID, &a.Type, &a.Severity, &a.Title, &a.Description, &a.Resource, &a.Status, &timestamp)
+		err := rows.Scan(&a.ID, &a.UserID, &a.Type, &a.Severity, &a.Title, &a.Description, &a.Resource, &a.Status, &a.CreatedAt)
 		if err != nil {
 			return nil, errors.DatabaseError("Failed to scan alert", err)
 		}
-		a.CreatedAt, _ = time.Parse(time.RFC3339, timestamp)
 		alerts = append(alerts, &a)
 	}
 
@@ -159,20 +158,25 @@ func (r *AlertRepository) List(ctx context.Context, userID int64, filter alert.F
 }
 
 func (r *AlertRepository) ListWithPagination(ctx context.Context, userID int64, filter alert.Filter, limit, offset int) ([]*alert.Alert, int64, error) {
-	where := []string{"user_id = ?"}
+	paramN := 1
+	where := []string{fmt.Sprintf("user_id = $%d", paramN)}
 	args := []interface{}{userID}
+	paramN++
 
 	if filter.Type != "" {
-		where = append(where, "type = ?")
+		where = append(where, fmt.Sprintf("type = $%d", paramN))
 		args = append(args, filter.Type)
+		paramN++
 	}
 	if filter.Severity != "" {
-		where = append(where, "severity = ?")
+		where = append(where, fmt.Sprintf("severity = $%d", paramN))
 		args = append(args, filter.Severity)
+		paramN++
 	}
 	if filter.Status != "" {
-		where = append(where, "status = ?")
+		where = append(where, fmt.Sprintf("status = $%d", paramN))
 		args = append(args, filter.Status)
+		paramN++
 	}
 
 	whereClause := strings.Join(where, " AND ")
@@ -186,8 +190,8 @@ func (r *AlertRepository) ListWithPagination(ctx context.Context, userID int64, 
 
 	query := fmt.Sprintf(`
 		SELECT id, user_id, type, severity, title, description, resource, status, created_at
-		FROM alerts WHERE %s ORDER BY id DESC LIMIT ? OFFSET ?
-	`, whereClause)
+		FROM alerts WHERE %s ORDER BY id DESC LIMIT $%d OFFSET $%d
+	`, whereClause, paramN, paramN+1)
 
 	args = append(args, limit, offset)
 	rows, err := r.db.QueryContext(ctx, query, args...)
@@ -200,12 +204,10 @@ func (r *AlertRepository) ListWithPagination(ctx context.Context, userID int64, 
 	alerts := make([]*alert.Alert, 0, limit)
 	for rows.Next() {
 		var a alert.Alert
-		var timestamp string
-		err := rows.Scan(&a.ID, &a.UserID, &a.Type, &a.Severity, &a.Title, &a.Description, &a.Resource, &a.Status, &timestamp)
+		err := rows.Scan(&a.ID, &a.UserID, &a.Type, &a.Severity, &a.Title, &a.Description, &a.Resource, &a.Status, &a.CreatedAt)
 		if err != nil {
 			return nil, 0, errors.DatabaseError("Failed to scan alert", err)
 		}
-		a.CreatedAt, _ = time.Parse(time.RFC3339, timestamp)
 		alerts = append(alerts, &a)
 	}
 
@@ -213,7 +215,7 @@ func (r *AlertRepository) ListWithPagination(ctx context.Context, userID int64, 
 }
 
 func (r *AlertRepository) CountByStatus(ctx context.Context, userID int64) (map[string]int, error) {
-	query := `SELECT status, COUNT(*) FROM alerts WHERE user_id = ? GROUP BY status`
+	query := `SELECT status, COUNT(*) FROM alerts WHERE user_id = $1 GROUP BY status`
 
 	rows, err := r.db.QueryContext(ctx, query, userID)
 	if err != nil {
