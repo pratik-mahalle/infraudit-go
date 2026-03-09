@@ -3,7 +3,6 @@ package postgres
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -25,22 +24,20 @@ func (r *RecommendationRepository) Create(ctx context.Context, rec *recommendati
 	rec.CreatedAt = now
 	rec.UpdatedAt = now
 
-	resourcesJSON, _ := json.Marshal(rec.Resources)
-
 	status := rec.Status
 	if status == "" {
 		status = "pending"
 	}
 
 	query := `
-		INSERT INTO recommendations (user_id, type, priority, title, description, savings, effort, impact, category, status, resources)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		INSERT INTO recommendations (user_id, type, priority, title, description, estimated_savings, effort, impact, category, status)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		RETURNING id
 	`
 
 	var id int64
 	err := r.db.QueryRowContext(ctx, query,
-		rec.UserID, rec.Type, rec.Priority, rec.Title, rec.Description, rec.Savings, rec.Effort, rec.Impact, rec.Category, status, string(resourcesJSON),
+		rec.UserID, rec.Type, rec.Priority, rec.Title, rec.Description, rec.Savings, rec.Effort, rec.Impact, rec.Category, status,
 	).Scan(&id)
 	if err != nil {
 		return 0, errors.DatabaseError("Failed to create recommendation", err)
@@ -51,14 +48,13 @@ func (r *RecommendationRepository) Create(ctx context.Context, rec *recommendati
 
 func (r *RecommendationRepository) GetByID(ctx context.Context, userID int64, id int64) (*recommendation.Recommendation, error) {
 	query := `
-		SELECT id, user_id, type, priority, title, description, savings, effort, impact, category, status, resources
+		SELECT id, user_id, type, priority, title, description, estimated_savings, effort, impact, category, status
 		FROM recommendations WHERE user_id = $1 AND id = $2
 	`
 
 	var rec recommendation.Recommendation
-	var resourcesJSON string
 	err := r.db.QueryRowContext(ctx, query, userID, id).Scan(
-		&rec.ID, &rec.UserID, &rec.Type, &rec.Priority, &rec.Title, &rec.Description, &rec.Savings, &rec.Effort, &rec.Impact, &rec.Category, &rec.Status, &resourcesJSON,
+		&rec.ID, &rec.UserID, &rec.Type, &rec.Priority, &rec.Title, &rec.Description, &rec.Savings, &rec.Effort, &rec.Impact, &rec.Category, &rec.Status,
 	)
 
 	if err == sql.ErrNoRows {
@@ -68,13 +64,12 @@ func (r *RecommendationRepository) GetByID(ctx context.Context, userID int64, id
 		return nil, errors.DatabaseError("Failed to get recommendation", err)
 	}
 
-	json.Unmarshal([]byte(resourcesJSON), &rec.Resources)
+	rec.Resources = []string{}
 	return &rec, nil
 }
 
 func (r *RecommendationRepository) Update(ctx context.Context, rec *recommendation.Recommendation) error {
 	rec.UpdatedAt = time.Now()
-	resourcesJSON, _ := json.Marshal(rec.Resources)
 
 	status := rec.Status
 	if status == "" {
@@ -82,12 +77,12 @@ func (r *RecommendationRepository) Update(ctx context.Context, rec *recommendati
 	}
 
 	query := `
-		UPDATE recommendations SET type = $1, priority = $2, title = $3, description = $4, savings = $5, effort = $6, impact = $7, category = $8, status = $9, resources = $10
-		WHERE user_id = $11 AND id = $12
+		UPDATE recommendations SET type = $1, priority = $2, title = $3, description = $4, estimated_savings = $5, effort = $6, impact = $7, category = $8, status = $9
+		WHERE user_id = $10 AND id = $11
 	`
 
 	result, err := r.db.ExecContext(ctx, query,
-		rec.Type, rec.Priority, rec.Title, rec.Description, rec.Savings, rec.Effort, rec.Impact, rec.Category, status, string(resourcesJSON), rec.UserID, rec.ID,
+		rec.Type, rec.Priority, rec.Title, rec.Description, rec.Savings, rec.Effort, rec.Impact, rec.Category, status, rec.UserID, rec.ID,
 	)
 	if err != nil {
 		return errors.DatabaseError("Failed to update recommendation", err)
@@ -143,7 +138,7 @@ func (r *RecommendationRepository) List(ctx context.Context, userID int64, filte
 	}
 
 	query := fmt.Sprintf(`
-		SELECT id, user_id, type, priority, title, description, savings, effort, impact, category, status, resources
+		SELECT id, user_id, type, priority, title, description, estimated_savings, effort, impact, category, status
 		FROM recommendations WHERE %s ORDER BY id DESC
 	`, strings.Join(where, " AND "))
 
@@ -157,12 +152,11 @@ func (r *RecommendationRepository) List(ctx context.Context, userID int64, filte
 	recs := make([]*recommendation.Recommendation, 0, 100)
 	for rows.Next() {
 		var rec recommendation.Recommendation
-		var resourcesJSON string
-		err := rows.Scan(&rec.ID, &rec.UserID, &rec.Type, &rec.Priority, &rec.Title, &rec.Description, &rec.Savings, &rec.Effort, &rec.Impact, &rec.Category, &rec.Status, &resourcesJSON)
+		err := rows.Scan(&rec.ID, &rec.UserID, &rec.Type, &rec.Priority, &rec.Title, &rec.Description, &rec.Savings, &rec.Effort, &rec.Impact, &rec.Category, &rec.Status)
 		if err != nil {
 			return nil, errors.DatabaseError("Failed to scan recommendation", err)
 		}
-		json.Unmarshal([]byte(resourcesJSON), &rec.Resources)
+		rec.Resources = []string{}
 		recs = append(recs, &rec)
 	}
 
@@ -204,7 +198,7 @@ func (r *RecommendationRepository) ListWithPagination(ctx context.Context, userI
 	}
 
 	query := fmt.Sprintf(`
-		SELECT id, user_id, type, priority, title, description, savings, effort, impact, category, status, resources
+		SELECT id, user_id, type, priority, title, description, estimated_savings, effort, impact, category, status
 		FROM recommendations WHERE %s ORDER BY id DESC LIMIT $%d OFFSET $%d
 	`, whereClause, paramN, paramN+1)
 
@@ -219,12 +213,11 @@ func (r *RecommendationRepository) ListWithPagination(ctx context.Context, userI
 	recs := make([]*recommendation.Recommendation, 0, limit)
 	for rows.Next() {
 		var rec recommendation.Recommendation
-		var resourcesJSON string
-		err := rows.Scan(&rec.ID, &rec.UserID, &rec.Type, &rec.Priority, &rec.Title, &rec.Description, &rec.Savings, &rec.Effort, &rec.Impact, &rec.Category, &rec.Status, &resourcesJSON)
+		err := rows.Scan(&rec.ID, &rec.UserID, &rec.Type, &rec.Priority, &rec.Title, &rec.Description, &rec.Savings, &rec.Effort, &rec.Impact, &rec.Category, &rec.Status)
 		if err != nil {
 			return nil, 0, errors.DatabaseError("Failed to scan recommendation", err)
 		}
-		json.Unmarshal([]byte(resourcesJSON), &rec.Resources)
+		rec.Resources = []string{}
 		recs = append(recs, &rec)
 	}
 
@@ -233,7 +226,7 @@ func (r *RecommendationRepository) ListWithPagination(ctx context.Context, userI
 
 func (r *RecommendationRepository) GetTotalSavings(ctx context.Context, userID int64) (float64, error) {
 	var total float64
-	err := r.db.QueryRowContext(ctx, "SELECT COALESCE(SUM(savings), 0) FROM recommendations WHERE user_id = $1", userID).Scan(&total)
+	err := r.db.QueryRowContext(ctx, "SELECT COALESCE(SUM(estimated_savings), 0) FROM recommendations WHERE user_id = $1", userID).Scan(&total)
 	if err != nil {
 		return 0, errors.DatabaseError("Failed to get total savings", err)
 	}

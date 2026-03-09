@@ -25,7 +25,7 @@ func (r *AlertRepository) Create(ctx context.Context, a *alert.Alert) (int64, er
 	a.UpdatedAt = now
 
 	query := `
-		INSERT INTO alerts (user_id, type, severity, title, description, resource, status, created_at)
+		INSERT INTO alerts (user_id, type, severity, title, description, resource_name, status, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		RETURNING id
 	`
@@ -43,7 +43,7 @@ func (r *AlertRepository) Create(ctx context.Context, a *alert.Alert) (int64, er
 
 func (r *AlertRepository) GetByID(ctx context.Context, userID int64, id int64) (*alert.Alert, error) {
 	query := `
-		SELECT id, user_id, type, severity, title, description, resource, status, created_at
+		SELECT id, user_id, type, severity, title, description, resource_name, status, created_at
 		FROM alerts WHERE user_id = $1 AND id = $2
 	`
 
@@ -66,7 +66,7 @@ func (r *AlertRepository) Update(ctx context.Context, a *alert.Alert) error {
 	a.UpdatedAt = time.Now()
 
 	query := `
-		UPDATE alerts SET type = $1, severity = $2, title = $3, description = $4, resource = $5, status = $6
+		UPDATE alerts SET type = $1, severity = $2, title = $3, description = $4, resource_name = $5, status = $6
 		WHERE user_id = $7 AND id = $8
 	`
 
@@ -127,13 +127,13 @@ func (r *AlertRepository) List(ctx context.Context, userID int64, filter alert.F
 		paramN++
 	}
 	if filter.Resource != "" {
-		where = append(where, fmt.Sprintf("resource = $%d", paramN))
+		where = append(where, fmt.Sprintf("resource_name = $%d", paramN))
 		args = append(args, filter.Resource)
 		paramN++
 	}
 
 	query := fmt.Sprintf(`
-		SELECT id, user_id, type, severity, title, description, resource, status, created_at
+		SELECT id, user_id, type, severity, title, description, resource_name, status, created_at
 		FROM alerts WHERE %s ORDER BY id DESC
 	`, strings.Join(where, " AND "))
 
@@ -189,7 +189,7 @@ func (r *AlertRepository) ListWithPagination(ctx context.Context, userID int64, 
 	}
 
 	query := fmt.Sprintf(`
-		SELECT id, user_id, type, severity, title, description, resource, status, created_at
+		SELECT id, user_id, type, severity, title, description, resource_name, status, created_at
 		FROM alerts WHERE %s ORDER BY id DESC LIMIT $%d OFFSET $%d
 	`, whereClause, paramN, paramN+1)
 

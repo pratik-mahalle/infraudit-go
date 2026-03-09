@@ -11,7 +11,7 @@ import (
 	"github.com/pratik-mahalle/infraudit/internal/domain/notification"
 )
 
-// NotificationRepository implements notification.Repository for PostgreSQL/SQLite
+// NotificationRepository implements notification.Repository for PostgreSQL
 type NotificationRepository struct {
 	db *sql.DB
 }
@@ -36,7 +36,7 @@ func (r *NotificationRepository) CreatePreference(ctx context.Context, p *notifi
 
 	query := `
 		INSERT INTO notification_preferences (id, user_id, channel, is_enabled, config, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 	`
 
 	now := time.Now()
@@ -64,7 +64,7 @@ func (r *NotificationRepository) GetPreference(ctx context.Context, userID int64
 	query := `
 		SELECT id, user_id, channel, is_enabled, config, created_at, updated_at
 		FROM notification_preferences
-		WHERE user_id = ? AND channel = ?
+		WHERE user_id = $1 AND channel = $2
 	`
 
 	var p notification.Preference
@@ -105,8 +105,8 @@ func (r *NotificationRepository) UpdatePreference(ctx context.Context, p *notifi
 
 	query := `
 		UPDATE notification_preferences
-		SET is_enabled = ?, config = ?, updated_at = ?
-		WHERE id = ?
+		SET is_enabled = $1, config = $2, updated_at = $3
+		WHERE id = $4
 	`
 
 	p.UpdatedAt = time.Now()
@@ -134,7 +134,7 @@ func (r *NotificationRepository) ListPreferences(ctx context.Context, userID int
 	query := `
 		SELECT id, user_id, channel, is_enabled, config, created_at, updated_at
 		FROM notification_preferences
-		WHERE user_id = ?
+		WHERE user_id = $1
 		ORDER BY channel
 	`
 
@@ -176,7 +176,7 @@ func (r *NotificationRepository) ListPreferences(ctx context.Context, userID int
 
 // DeletePreference deletes a notification preference
 func (r *NotificationRepository) DeletePreference(ctx context.Context, id string) error {
-	query := `DELETE FROM notification_preferences WHERE id = ?`
+	query := `DELETE FROM notification_preferences WHERE id = $1`
 
 	result, err := r.db.ExecContext(ctx, query, id)
 	if err != nil {
@@ -205,8 +205,8 @@ func (r *NotificationRepository) CreateLog(ctx context.Context, l *notification.
 	}
 
 	query := `
-		INSERT INTO notification_logs (id, user_id, channel, notification_type, status, priority, payload, error_message, retry_count, sent_at, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO notification_logs (id, user_id, channel, event_type, status, priority, message, error_message, retry_count, sent_at, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 	`
 
 	now := time.Now()
@@ -241,8 +241,8 @@ func (r *NotificationRepository) UpdateLog(ctx context.Context, l *notification.
 
 	query := `
 		UPDATE notification_logs
-		SET status = ?, error_message = ?, retry_count = ?, sent_at = ?
-		WHERE id = ?
+		SET status = $1, error_message = $2, retry_count = $3, sent_at = $4
+		WHERE id = $5
 	`
 
 	_, err = r.db.ExecContext(ctx, query,
@@ -257,9 +257,9 @@ func (r *NotificationRepository) UpdateLog(ctx context.Context, l *notification.
 		return fmt.Errorf("failed to update notification log: %w", err)
 	}
 
-	// Update payload if needed
+	// Update message (payload) if needed
 	if len(l.Payload) > 0 {
-		updateQuery := `UPDATE notification_logs SET payload = ? WHERE id = ?`
+		updateQuery := `UPDATE notification_logs SET message = $1 WHERE id = $2`
 		r.db.ExecContext(ctx, updateQuery, string(payloadJSON), l.ID)
 	}
 
@@ -268,52 +268,55 @@ func (r *NotificationRepository) UpdateLog(ctx context.Context, l *notification.
 
 // ListLogs lists notification logs with filtering
 func (r *NotificationRepository) ListLogs(ctx context.Context, filter notification.LogFilter, limit, offset int) ([]*notification.Log, int64, error) {
-	query := `
-		SELECT id, user_id, channel, notification_type, status, priority, payload, error_message, retry_count, sent_at, created_at
+	baseSelect := `
+		SELECT id, user_id, channel, event_type, status, priority, message, error_message, retry_count, sent_at, created_at
 		FROM notification_logs
 		WHERE 1=1
 	`
-	countQuery := `SELECT COUNT(*) FROM notification_logs WHERE 1=1`
+	countBase := `SELECT COUNT(*) FROM notification_logs WHERE 1=1`
 	var args []interface{}
+	paramN := 1
 
+	queryFilters := ""
 	if filter.UserID > 0 {
-		query += " AND user_id = ?"
-		countQuery += " AND user_id = ?"
+		queryFilters += fmt.Sprintf(" AND user_id = $%d", paramN)
 		args = append(args, filter.UserID)
+		paramN++
 	}
 	if filter.Channel != "" {
-		query += " AND channel = ?"
-		countQuery += " AND channel = ?"
+		queryFilters += fmt.Sprintf(" AND channel = $%d", paramN)
 		args = append(args, string(filter.Channel))
+		paramN++
 	}
 	if filter.NotificationType != "" {
-		query += " AND notification_type = ?"
-		countQuery += " AND notification_type = ?"
+		queryFilters += fmt.Sprintf(" AND event_type = $%d", paramN)
 		args = append(args, string(filter.NotificationType))
+		paramN++
 	}
 	if filter.Status != "" {
-		query += " AND status = ?"
-		countQuery += " AND status = ?"
+		queryFilters += fmt.Sprintf(" AND status = $%d", paramN)
 		args = append(args, string(filter.Status))
+		paramN++
 	}
 	if filter.From != nil {
-		query += " AND created_at >= ?"
-		countQuery += " AND created_at >= ?"
+		queryFilters += fmt.Sprintf(" AND created_at >= $%d", paramN)
 		args = append(args, *filter.From)
+		paramN++
 	}
 	if filter.To != nil {
-		query += " AND created_at <= ?"
-		countQuery += " AND created_at <= ?"
+		queryFilters += fmt.Sprintf(" AND created_at <= $%d", paramN)
 		args = append(args, *filter.To)
+		paramN++
 	}
 
+	countQuery := countBase + queryFilters
 	var total int64
 	err := r.db.QueryRowContext(ctx, countQuery, args...).Scan(&total)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to count notification logs: %w", err)
 	}
 
-	query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
+	query := baseSelect + queryFilters + fmt.Sprintf(" ORDER BY created_at DESC LIMIT $%d OFFSET $%d", paramN, paramN+1)
 	args = append(args, limit, offset)
 
 	rows, err := r.db.QueryContext(ctx, query, args...)
@@ -366,7 +369,7 @@ func (r *NotificationRepository) ListLogs(ctx context.Context, filter notificati
 // GetPendingLogs retrieves pending notification logs
 func (r *NotificationRepository) GetPendingLogs(ctx context.Context) ([]*notification.Log, error) {
 	query := `
-		SELECT id, user_id, channel, notification_type, status, priority, payload, error_message, retry_count, sent_at, created_at
+		SELECT id, user_id, channel, event_type, status, priority, message, error_message, retry_count, sent_at, created_at
 		FROM notification_logs
 		WHERE status IN ('pending', 'retrying')
 		ORDER BY priority DESC, created_at ASC
@@ -436,8 +439,8 @@ func (r *NotificationRepository) CreateWebhook(ctx context.Context, w *notificat
 	retryJSON, _ := json.Marshal(w.RetryConfig)
 
 	query := `
-		INSERT INTO webhooks (id, user_id, name, url, secret, events, is_enabled, retry_config, last_triggered, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO webhooks (id, user_id, name, url, secret, event_types, is_enabled, retry_config, last_triggered_at, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 	`
 
 	now := time.Now()
@@ -467,9 +470,9 @@ func (r *NotificationRepository) CreateWebhook(ctx context.Context, w *notificat
 // GetWebhook retrieves a webhook by ID
 func (r *NotificationRepository) GetWebhook(ctx context.Context, id string) (*notification.Webhook, error) {
 	query := `
-		SELECT id, user_id, name, url, secret, events, is_enabled, retry_config, last_triggered, created_at, updated_at
+		SELECT id, user_id, name, url, secret, event_types, is_enabled, retry_config, last_triggered_at, created_at, updated_at
 		FROM webhooks
-		WHERE id = ?
+		WHERE id = $1
 	`
 
 	var w notification.Webhook
@@ -524,8 +527,8 @@ func (r *NotificationRepository) UpdateWebhook(ctx context.Context, w *notificat
 
 	query := `
 		UPDATE webhooks
-		SET name = ?, url = ?, secret = ?, events = ?, is_enabled = ?, retry_config = ?, last_triggered = ?, updated_at = ?
-		WHERE id = ?
+		SET name = $1, url = $2, secret = $3, event_types = $4, is_enabled = $5, retry_config = $6, last_triggered_at = $7, updated_at = $8
+		WHERE id = $9
 	`
 
 	w.UpdatedAt = time.Now()
@@ -555,7 +558,7 @@ func (r *NotificationRepository) UpdateWebhook(ctx context.Context, w *notificat
 
 // DeleteWebhook deletes a webhook
 func (r *NotificationRepository) DeleteWebhook(ctx context.Context, id string) error {
-	query := `DELETE FROM webhooks WHERE id = ?`
+	query := `DELETE FROM webhooks WHERE id = $1`
 
 	result, err := r.db.ExecContext(ctx, query, id)
 	if err != nil {
@@ -572,7 +575,7 @@ func (r *NotificationRepository) DeleteWebhook(ctx context.Context, id string) e
 
 // ListWebhooks lists webhooks for a user
 func (r *NotificationRepository) ListWebhooks(ctx context.Context, userID int64, limit, offset int) ([]*notification.Webhook, int64, error) {
-	countQuery := `SELECT COUNT(*) FROM webhooks WHERE user_id = ?`
+	countQuery := `SELECT COUNT(*) FROM webhooks WHERE user_id = $1`
 	var total int64
 	err := r.db.QueryRowContext(ctx, countQuery, userID).Scan(&total)
 	if err != nil {
@@ -580,11 +583,11 @@ func (r *NotificationRepository) ListWebhooks(ctx context.Context, userID int64,
 	}
 
 	query := `
-		SELECT id, user_id, name, url, secret, events, is_enabled, retry_config, last_triggered, created_at, updated_at
+		SELECT id, user_id, name, url, secret, event_types, is_enabled, retry_config, last_triggered_at, created_at, updated_at
 		FROM webhooks
-		WHERE user_id = ?
+		WHERE user_id = $1
 		ORDER BY created_at DESC
-		LIMIT ? OFFSET ?
+		LIMIT $2 OFFSET $3
 	`
 
 	rows, err := r.db.QueryContext(ctx, query, userID, limit, offset)
@@ -638,9 +641,9 @@ func (r *NotificationRepository) ListWebhooks(ctx context.Context, userID int64,
 // GetWebhooksForEvent retrieves webhooks subscribed to an event
 func (r *NotificationRepository) GetWebhooksForEvent(ctx context.Context, userID int64, eventType notification.EventType) ([]*notification.Webhook, error) {
 	query := `
-		SELECT id, user_id, name, url, secret, events, is_enabled, retry_config, last_triggered, created_at, updated_at
+		SELECT id, user_id, name, url, secret, event_types, is_enabled, retry_config, last_triggered_at, created_at, updated_at
 		FROM webhooks
-		WHERE user_id = ? AND is_enabled = true
+		WHERE user_id = $1 AND is_enabled = true
 	`
 
 	rows, err := r.db.QueryContext(ctx, query, userID)
@@ -706,8 +709,8 @@ func (r *NotificationRepository) CreateDelivery(ctx context.Context, d *notifica
 	}
 
 	query := `
-		INSERT INTO webhook_deliveries (id, webhook_id, event_type, payload, status, response_status, response_body, retry_count, delivered_at, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO webhook_deliveries (id, webhook_id, event_type, payload, status, response_status, response_body, retry_count, attempted_at, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 	`
 
 	now := time.Now()
@@ -736,8 +739,8 @@ func (r *NotificationRepository) CreateDelivery(ctx context.Context, d *notifica
 func (r *NotificationRepository) UpdateDelivery(ctx context.Context, d *notification.WebhookDelivery) error {
 	query := `
 		UPDATE webhook_deliveries
-		SET status = ?, response_status = ?, response_body = ?, retry_count = ?, delivered_at = ?
-		WHERE id = ?
+		SET status = $1, response_status = $2, response_body = $3, retry_count = $4, attempted_at = $5
+		WHERE id = $6
 	`
 
 	_, err := r.db.ExecContext(ctx, query,
@@ -759,7 +762,7 @@ func (r *NotificationRepository) UpdateDelivery(ctx context.Context, d *notifica
 // GetPendingDeliveries retrieves pending webhook deliveries
 func (r *NotificationRepository) GetPendingDeliveries(ctx context.Context) ([]*notification.WebhookDelivery, error) {
 	query := `
-		SELECT id, webhook_id, event_type, payload, status, response_status, response_body, retry_count, delivered_at, created_at
+		SELECT id, webhook_id, event_type, payload, status, response_status, response_body, retry_count, attempted_at, created_at
 		FROM webhook_deliveries
 		WHERE status = 'pending'
 		ORDER BY created_at ASC
@@ -812,7 +815,7 @@ func (r *NotificationRepository) GetPendingDeliveries(ctx context.Context) ([]*n
 
 // ListDeliveries lists webhook deliveries
 func (r *NotificationRepository) ListDeliveries(ctx context.Context, webhookID string, limit, offset int) ([]*notification.WebhookDelivery, int64, error) {
-	countQuery := `SELECT COUNT(*) FROM webhook_deliveries WHERE webhook_id = ?`
+	countQuery := `SELECT COUNT(*) FROM webhook_deliveries WHERE webhook_id = $1`
 	var total int64
 	err := r.db.QueryRowContext(ctx, countQuery, webhookID).Scan(&total)
 	if err != nil {
@@ -820,11 +823,11 @@ func (r *NotificationRepository) ListDeliveries(ctx context.Context, webhookID s
 	}
 
 	query := `
-		SELECT id, webhook_id, event_type, payload, status, response_status, response_body, retry_count, delivered_at, created_at
+		SELECT id, webhook_id, event_type, payload, status, response_status, response_body, retry_count, attempted_at, created_at
 		FROM webhook_deliveries
-		WHERE webhook_id = ?
+		WHERE webhook_id = $1
 		ORDER BY created_at DESC
-		LIMIT ? OFFSET ?
+		LIMIT $2 OFFSET $3
 	`
 
 	rows, err := r.db.QueryContext(ctx, query, webhookID, limit, offset)

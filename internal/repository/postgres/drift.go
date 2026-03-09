@@ -24,7 +24,7 @@ func (r *DriftRepository) Create(ctx context.Context, d *drift.Drift) (int64, er
 	d.CreatedAt = now
 	d.DetectedAt = now
 
-	query := `INSERT INTO drifts (user_id, resource_id, drift_type, severity, details, detected_at, status) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`
+	query := `INSERT INTO drifts (user_id, resource_id, type, severity, description, detected_at, status) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`
 
 	var id int64
 	err := r.db.QueryRowContext(ctx, query, d.UserID, d.ResourceID, d.DriftType, d.Severity, d.Details, now, d.Status).Scan(&id)
@@ -36,7 +36,7 @@ func (r *DriftRepository) Create(ctx context.Context, d *drift.Drift) (int64, er
 }
 
 func (r *DriftRepository) GetByID(ctx context.Context, userID int64, id int64) (*drift.Drift, error) {
-	query := `SELECT id, user_id, resource_id, drift_type, severity, details, detected_at, status FROM drifts WHERE user_id = $1 AND id = $2`
+	query := `SELECT id, user_id, resource_id, type, severity, description, detected_at, status FROM drifts WHERE user_id = $1 AND id = $2`
 
 	var d drift.Drift
 	err := r.db.QueryRowContext(ctx, query, userID, id).Scan(&d.ID, &d.UserID, &d.ResourceID, &d.DriftType, &d.Severity, &d.Details, &d.DetectedAt, &d.Status)
@@ -53,7 +53,7 @@ func (r *DriftRepository) GetByID(ctx context.Context, userID int64, id int64) (
 
 func (r *DriftRepository) Update(ctx context.Context, d *drift.Drift) error {
 	d.UpdatedAt = time.Now()
-	query := `UPDATE drifts SET resource_id = $1, drift_type = $2, severity = $3, details = $4, status = $5 WHERE user_id = $6 AND id = $7`
+	query := `UPDATE drifts SET resource_id = $1, type = $2, severity = $3, description = $4, status = $5 WHERE user_id = $6 AND id = $7`
 
 	result, err := r.db.ExecContext(ctx, query, d.ResourceID, d.DriftType, d.Severity, d.Details, d.Status, d.UserID, d.ID)
 	if err != nil {
@@ -94,7 +94,7 @@ func (r *DriftRepository) List(ctx context.Context, userID int64, filter drift.F
 		paramN++
 	}
 	if filter.DriftType != "" {
-		where = append(where, fmt.Sprintf("drift_type = $%d", paramN))
+		where = append(where, fmt.Sprintf("type = $%d", paramN))
 		args = append(args, filter.DriftType)
 		paramN++
 	}
@@ -109,7 +109,7 @@ func (r *DriftRepository) List(ctx context.Context, userID int64, filter drift.F
 		paramN++
 	}
 
-	query := fmt.Sprintf(`SELECT id, user_id, resource_id, drift_type, severity, details, detected_at, status FROM drifts WHERE %s ORDER BY id DESC`, strings.Join(where, " AND "))
+	query := fmt.Sprintf(`SELECT id, user_id, resource_id, type, severity, description, detected_at, status FROM drifts WHERE %s ORDER BY id DESC`, strings.Join(where, " AND "))
 
 	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
@@ -156,7 +156,7 @@ func (r *DriftRepository) ListWithPagination(ctx context.Context, userID int64, 
 		return nil, 0, errors.DatabaseError("Failed to count drifts", err)
 	}
 
-	query := fmt.Sprintf(`SELECT id, user_id, resource_id, drift_type, severity, details, detected_at, status FROM drifts WHERE %s ORDER BY id DESC LIMIT $%d OFFSET $%d`, whereClause, paramN, paramN+1)
+	query := fmt.Sprintf(`SELECT id, user_id, resource_id, type, severity, description, detected_at, status FROM drifts WHERE %s ORDER BY id DESC LIMIT $%d OFFSET $%d`, whereClause, paramN, paramN+1)
 
 	args = append(args, limit, offset)
 	rows, err := r.db.QueryContext(ctx, query, args...)

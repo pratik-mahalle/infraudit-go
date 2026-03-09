@@ -28,7 +28,7 @@ func (r *ResourceRepository) Create(ctx context.Context, res *resource.Resource)
 	res.UpdatedAt = now
 
 	query := `
-		INSERT INTO resources (user_id, provider, resource_id, name, resource_type, region, status, configuration)
+		INSERT INTO resources (user_id, provider, cloud_id, name, type, region, status, configuration)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 	`
 
@@ -45,9 +45,9 @@ func (r *ResourceRepository) Create(ctx context.Context, res *resource.Resource)
 // GetByID retrieves a resource by ID
 func (r *ResourceRepository) GetByID(ctx context.Context, userID int64, resourceID string) (*resource.Resource, error) {
 	query := `
-		SELECT user_id, provider, resource_id, name, resource_type, region, status, COALESCE(configuration, '')
+		SELECT user_id, provider, cloud_id, name, type, region, status, COALESCE(configuration, '')
 		FROM resources
-		WHERE user_id = $1 AND resource_id = $2
+		WHERE user_id = $1 AND cloud_id = $2
 	`
 
 	var res resource.Resource
@@ -71,8 +71,8 @@ func (r *ResourceRepository) Update(ctx context.Context, res *resource.Resource)
 
 	query := `
 		UPDATE resources
-		SET name = $1, resource_type = $2, region = $3, status = $4, configuration = $5
-		WHERE user_id = $6 AND resource_id = $7
+		SET name = $1, type = $2, region = $3, status = $4, configuration = $5
+		WHERE user_id = $6 AND cloud_id = $7
 	`
 
 	result, err := r.db.ExecContext(ctx, query,
@@ -96,7 +96,7 @@ func (r *ResourceRepository) Update(ctx context.Context, res *resource.Resource)
 
 // Delete deletes a resource
 func (r *ResourceRepository) Delete(ctx context.Context, userID int64, resourceID string) error {
-	query := `DELETE FROM resources WHERE user_id = $1 AND resource_id = $2`
+	query := `DELETE FROM resources WHERE user_id = $1 AND cloud_id = $2`
 
 	result, err := r.db.ExecContext(ctx, query, userID, resourceID)
 	if err != nil {
@@ -129,7 +129,7 @@ func (r *ResourceRepository) List(ctx context.Context, userID int64, filter reso
 		paramN++
 	}
 	if filter.Type != "" {
-		where = append(where, fmt.Sprintf("resource_type = $%d", paramN))
+		where = append(where, fmt.Sprintf("type = $%d", paramN))
 		args = append(args, filter.Type)
 		paramN++
 	}
@@ -156,10 +156,10 @@ func (r *ResourceRepository) List(ctx context.Context, userID int64, filter reso
 
 	// Get resources
 	query := fmt.Sprintf(`
-		SELECT user_id, provider, resource_id, name, resource_type, region, status, COALESCE(configuration, '')
+		SELECT user_id, provider, cloud_id, name, type, region, status, COALESCE(configuration, '')
 		FROM resources
 		WHERE %s
-		ORDER BY provider, resource_id
+		ORDER BY provider, cloud_id
 		LIMIT $%d OFFSET $%d
 	`, whereClause, paramN, paramN+1)
 
@@ -191,10 +191,10 @@ func (r *ResourceRepository) List(ctx context.Context, userID int64, filter reso
 // ListByProvider retrieves resources by provider
 func (r *ResourceRepository) ListByProvider(ctx context.Context, userID int64, provider string) ([]*resource.Resource, error) {
 	query := `
-		SELECT user_id, provider, resource_id, name, resource_type, region, status, COALESCE(configuration, '')
+		SELECT user_id, provider, cloud_id, name, type, region, status, COALESCE(configuration, '')
 		FROM resources
 		WHERE user_id = $1 AND provider = $2
-		ORDER BY resource_id
+		ORDER BY cloud_id
 	`
 
 	rows, err := r.db.QueryContext(ctx, query, userID, provider)
@@ -236,7 +236,7 @@ func (r *ResourceRepository) SaveBatch(ctx context.Context, userID int64, provid
 
 	// Insert new resources
 	stmt, err := tx.PrepareContext(ctx, `
-		INSERT INTO resources (user_id, provider, resource_id, name, resource_type, region, status, configuration)
+		INSERT INTO resources (user_id, provider, cloud_id, name, type, region, status, configuration)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 	`)
 	if err != nil {
