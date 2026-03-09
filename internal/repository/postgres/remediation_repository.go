@@ -11,7 +11,7 @@ import (
 	"github.com/pratik-mahalle/infraudit/internal/domain/remediation"
 )
 
-// RemediationRepository implements remediation.Repository for PostgreSQL/SQLite
+// RemediationRepository implements remediation.Repository for PostgreSQL
 type RemediationRepository struct {
 	db *sql.DB
 }
@@ -37,10 +37,10 @@ func (r *RemediationRepository) Create(ctx context.Context, a *remediation.Actio
 
 	query := `
 		INSERT INTO remediation_actions (
-			id, user_id, drift_id, vulnerability_id, remediation_type, status, 
-			strategy, approval_required, approved_by, approved_at, started_at, 
-			completed_at, result, rollback_data, error_message, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			id, user_id, drift_id, vulnerability_id, type, status,
+			action_config, requires_approval, approved_by, approved_at, started_at,
+			completed_at, result, rollback_config, error_message, created_at, updated_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
 	`
 
 	now := time.Now()
@@ -76,11 +76,11 @@ func (r *RemediationRepository) Create(ctx context.Context, a *remediation.Actio
 // GetByID retrieves a remediation action by ID
 func (r *RemediationRepository) GetByID(ctx context.Context, id string) (*remediation.Action, error) {
 	query := `
-		SELECT id, user_id, drift_id, vulnerability_id, remediation_type, status,
-			   strategy, approval_required, approved_by, approved_at, started_at,
-			   completed_at, result, rollback_data, error_message, created_at, updated_at
+		SELECT id, user_id, drift_id, vulnerability_id, type, status,
+			   action_config, requires_approval, approved_by, approved_at, started_at,
+			   completed_at, result, rollback_config, error_message, created_at, updated_at
 		FROM remediation_actions
-		WHERE id = ?
+		WHERE id = $1
 	`
 
 	return r.scanAction(r.db.QueryRowContext(ctx, query, id))
@@ -98,10 +98,10 @@ func (r *RemediationRepository) Update(ctx context.Context, a *remediation.Actio
 
 	query := `
 		UPDATE remediation_actions
-		SET status = ?, strategy = ?, approval_required = ?, approved_by = ?, 
-			approved_at = ?, started_at = ?, completed_at = ?, result = ?, 
-			rollback_data = ?, error_message = ?, updated_at = ?
-		WHERE id = ?
+		SET status = $1, action_config = $2, requires_approval = $3, approved_by = $4,
+			approved_at = $5, started_at = $6, completed_at = $7, result = $8,
+			rollback_config = $9, error_message = $10, updated_at = $11
+		WHERE id = $12
 	`
 
 	a.UpdatedAt = time.Now()
@@ -134,7 +134,7 @@ func (r *RemediationRepository) Update(ctx context.Context, a *remediation.Actio
 
 // Delete deletes a remediation action
 func (r *RemediationRepository) Delete(ctx context.Context, id string) error {
-	query := `DELETE FROM remediation_actions WHERE id = ?`
+	query := `DELETE FROM remediation_actions WHERE id = $1`
 
 	result, err := r.db.ExecContext(ctx, query, id)
 	if err != nil {
@@ -151,59 +151,62 @@ func (r *RemediationRepository) Delete(ctx context.Context, id string) error {
 
 // List lists remediation actions with filtering
 func (r *RemediationRepository) List(ctx context.Context, filter remediation.Filter, limit, offset int) ([]*remediation.Action, int64, error) {
-	query := `
-		SELECT id, user_id, drift_id, vulnerability_id, remediation_type, status,
-			   strategy, approval_required, approved_by, approved_at, started_at,
-			   completed_at, result, rollback_data, error_message, created_at, updated_at
+	baseSelect := `
+		SELECT id, user_id, drift_id, vulnerability_id, type, status,
+			   action_config, requires_approval, approved_by, approved_at, started_at,
+			   completed_at, result, rollback_config, error_message, created_at, updated_at
 		FROM remediation_actions
 		WHERE 1=1
 	`
-	countQuery := `SELECT COUNT(*) FROM remediation_actions WHERE 1=1`
+	countBase := `SELECT COUNT(*) FROM remediation_actions WHERE 1=1`
 	var args []interface{}
+	paramN := 1
 
+	queryFilters := ""
 	if filter.UserID > 0 {
-		query += " AND user_id = ?"
-		countQuery += " AND user_id = ?"
+		queryFilters += fmt.Sprintf(" AND user_id = $%d", paramN)
 		args = append(args, filter.UserID)
+		paramN++
 	}
 	if filter.Status != "" {
-		query += " AND status = ?"
-		countQuery += " AND status = ?"
+		queryFilters += fmt.Sprintf(" AND status = $%d", paramN)
 		args = append(args, string(filter.Status))
+		paramN++
 	}
 	if filter.RemediationType != "" {
-		query += " AND remediation_type = ?"
-		countQuery += " AND remediation_type = ?"
+		queryFilters += fmt.Sprintf(" AND type = $%d", paramN)
 		args = append(args, string(filter.RemediationType))
+		paramN++
 	}
 	if filter.DriftID != nil {
-		query += " AND drift_id = ?"
-		countQuery += " AND drift_id = ?"
+		queryFilters += fmt.Sprintf(" AND drift_id = $%d", paramN)
 		args = append(args, *filter.DriftID)
+		paramN++
 	}
 	if filter.VulnerabilityID != nil {
-		query += " AND vulnerability_id = ?"
-		countQuery += " AND vulnerability_id = ?"
+		queryFilters += fmt.Sprintf(" AND vulnerability_id = $%d", paramN)
 		args = append(args, *filter.VulnerabilityID)
+		paramN++
 	}
 	if filter.From != nil {
-		query += " AND created_at >= ?"
-		countQuery += " AND created_at >= ?"
+		queryFilters += fmt.Sprintf(" AND created_at >= $%d", paramN)
 		args = append(args, *filter.From)
+		paramN++
 	}
 	if filter.To != nil {
-		query += " AND created_at <= ?"
-		countQuery += " AND created_at <= ?"
+		queryFilters += fmt.Sprintf(" AND created_at <= $%d", paramN)
 		args = append(args, *filter.To)
+		paramN++
 	}
 
+	countQuery := countBase + queryFilters
 	var total int64
 	err := r.db.QueryRowContext(ctx, countQuery, args...).Scan(&total)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to count remediation actions: %w", err)
 	}
 
-	query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
+	query := baseSelect + queryFilters + fmt.Sprintf(" ORDER BY created_at DESC LIMIT $%d OFFSET $%d", paramN, paramN+1)
 	args = append(args, limit, offset)
 
 	rows, err := r.db.QueryContext(ctx, query, args...)
@@ -227,11 +230,11 @@ func (r *RemediationRepository) List(ctx context.Context, filter remediation.Fil
 // GetByDriftID retrieves remediation actions for a drift
 func (r *RemediationRepository) GetByDriftID(ctx context.Context, driftID string) ([]*remediation.Action, error) {
 	query := `
-		SELECT id, user_id, drift_id, vulnerability_id, remediation_type, status,
-			   strategy, approval_required, approved_by, approved_at, started_at,
-			   completed_at, result, rollback_data, error_message, created_at, updated_at
+		SELECT id, user_id, drift_id, vulnerability_id, type, status,
+			   action_config, requires_approval, approved_by, approved_at, started_at,
+			   completed_at, result, rollback_config, error_message, created_at, updated_at
 		FROM remediation_actions
-		WHERE drift_id = ?
+		WHERE drift_id = $1
 		ORDER BY created_at DESC
 	`
 
@@ -256,11 +259,11 @@ func (r *RemediationRepository) GetByDriftID(ctx context.Context, driftID string
 // GetByVulnerabilityID retrieves remediation actions for a vulnerability
 func (r *RemediationRepository) GetByVulnerabilityID(ctx context.Context, vulnerabilityID string) ([]*remediation.Action, error) {
 	query := `
-		SELECT id, user_id, drift_id, vulnerability_id, remediation_type, status,
-			   strategy, approval_required, approved_by, approved_at, started_at,
-			   completed_at, result, rollback_data, error_message, created_at, updated_at
+		SELECT id, user_id, drift_id, vulnerability_id, type, status,
+			   action_config, requires_approval, approved_by, approved_at, started_at,
+			   completed_at, result, rollback_config, error_message, created_at, updated_at
 		FROM remediation_actions
-		WHERE vulnerability_id = ?
+		WHERE vulnerability_id = $1
 		ORDER BY created_at DESC
 	`
 
@@ -285,11 +288,11 @@ func (r *RemediationRepository) GetByVulnerabilityID(ctx context.Context, vulner
 // GetPendingApprovals retrieves pending approval actions for a user
 func (r *RemediationRepository) GetPendingApprovals(ctx context.Context, userID int64) ([]*remediation.Action, error) {
 	query := `
-		SELECT id, user_id, drift_id, vulnerability_id, remediation_type, status,
-			   strategy, approval_required, approved_by, approved_at, started_at,
-			   completed_at, result, rollback_data, error_message, created_at, updated_at
+		SELECT id, user_id, drift_id, vulnerability_id, type, status,
+			   action_config, requires_approval, approved_by, approved_at, started_at,
+			   completed_at, result, rollback_config, error_message, created_at, updated_at
 		FROM remediation_actions
-		WHERE user_id = ? AND status = 'pending' AND approval_required = true
+		WHERE user_id = $1 AND status = 'pending' AND requires_approval = true
 		ORDER BY created_at DESC
 	`
 
@@ -316,7 +319,7 @@ func (r *RemediationRepository) CountByStatus(ctx context.Context, userID int64)
 	query := `
 		SELECT status, COUNT(*) as count
 		FROM remediation_actions
-		WHERE user_id = ?
+		WHERE user_id = $1
 		GROUP BY status
 	`
 

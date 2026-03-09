@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -58,7 +57,6 @@ func SupabaseAuthMiddleware(kf *auth.JWKSKeyFunc, resolveUser UserResolver) func
 			// Parse and validate Supabase JWT (supports HS256 + ES256)
 			claims, err := auth.ParseSupabaseClaims(tokenStr, kf)
 			if err != nil {
-				fmt.Printf("[AUTH DEBUG] JWT parse error: %v\n", err)
 				utils.WriteError(w, errors.Unauthorized("Invalid or expired token"))
 				return
 			}
@@ -66,7 +64,6 @@ func SupabaseAuthMiddleware(kf *auth.JWKSKeyFunc, resolveUser UserResolver) func
 			// Resolve Supabase UUID to internal user ID
 			userID, err := resolveUser(r.Context(), claims.Sub)
 			if err != nil {
-				fmt.Printf("[AUTH DEBUG] User resolve error for sub=%s: %v\n", claims.Sub, err)
 				utils.WriteError(w, errors.Unauthorized("User profile not found"))
 				return
 			}

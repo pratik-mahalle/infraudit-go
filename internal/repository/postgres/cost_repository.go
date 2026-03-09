@@ -3,7 +3,6 @@ package postgres
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -28,13 +27,13 @@ func (r *CostRepository) CreateCost(ctx context.Context, c *cost.Cost) error {
 	}
 
 	query := `
-		INSERT INTO resource_costs (id, user_id, resource_id, provider, region, service_name, resource_type, cost_date, daily_cost, monthly_cost, currency, cost_details, tags, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+		INSERT INTO resource_costs (id, user_id, resource_id, provider, region, service_name, cost_date, daily_cost, monthly_cost, currency, tags, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 	`
 	_, err := r.db.ExecContext(ctx, query,
-		c.ID, c.UserID, c.ResourceID, c.Provider, c.Region, c.ServiceName, c.ResourceType,
-		c.CostDate, c.DailyCost, c.MonthlyCost, c.Currency, c.CostDetails, c.Tags,
-		time.Now(), time.Now(),
+		c.ID, c.UserID, c.ResourceID, c.Provider, c.Region, c.ServiceName,
+		c.CostDate, c.DailyCost, c.MonthlyCost, c.Currency, c.Tags,
+		time.Now(),
 	)
 	return err
 }
@@ -43,7 +42,7 @@ func (r *CostRepository) CreateCost(ctx context.Context, c *cost.Cost) error {
 func (r *CostRepository) GetCostsByDateRange(ctx context.Context, userID int64, filter cost.Filter, startDate, endDate time.Time) ([]*cost.Cost, error) {
 	paramN := 1
 	query := fmt.Sprintf(`
-		SELECT id, user_id, resource_id, provider, region, service_name, resource_type, cost_date, daily_cost, monthly_cost, currency, cost_details, tags, created_at, updated_at
+		SELECT id, user_id, resource_id, provider, region, service_name, cost_date, daily_cost, monthly_cost, currency, tags, created_at
 		FROM resource_costs
 		WHERE user_id = $%d AND cost_date BETWEEN $%d AND $%d
 	`, paramN, paramN+1, paramN+2)
@@ -83,9 +82,9 @@ func (r *CostRepository) GetCostsByDateRange(ctx context.Context, userID int64, 
 	for rows.Next() {
 		c := &cost.Cost{}
 		err := rows.Scan(
-			&c.ID, &c.UserID, &c.ResourceID, &c.Provider, &c.Region, &c.ServiceName, &c.ResourceType,
-			&c.CostDate, &c.DailyCost, &c.MonthlyCost, &c.Currency, &c.CostDetails, &c.Tags,
-			&c.CreatedAt, &c.UpdatedAt,
+			&c.ID, &c.UserID, &c.ResourceID, &c.Provider, &c.Region, &c.ServiceName,
+			&c.CostDate, &c.DailyCost, &c.MonthlyCost, &c.Currency, &c.Tags,
+			&c.CreatedAt,
 		)
 		if err != nil {
 			return nil, err
@@ -108,7 +107,6 @@ func (r *CostRepository) GetCostSummary(ctx context.Context, userID int64, filte
 		ByResource: make(map[string]float64),
 	}
 
-	// Get total cost
 	paramN := 1
 	query := fmt.Sprintf(`
 		SELECT COALESCE(SUM(daily_cost), 0)
@@ -130,7 +128,6 @@ func (r *CostRepository) GetCostSummary(ctx context.Context, userID int64, filte
 		return nil, err
 	}
 
-	// Get cost by service
 	serviceQuery := `
 		SELECT service_name, COALESCE(SUM(daily_cost), 0) as total
 		FROM resource_costs
@@ -153,7 +150,6 @@ func (r *CostRepository) GetCostSummary(ctx context.Context, userID int64, filte
 		summary.ByService[service] = total
 	}
 
-	// Get cost by region
 	regionQuery := `
 		SELECT region, COALESCE(SUM(daily_cost), 0) as total
 		FROM resource_costs
@@ -232,11 +228,11 @@ func (r *CostRepository) CreateAnomaly(ctx context.Context, a *cost.CostAnomaly)
 	}
 
 	query := `
-		INSERT INTO cost_anomalies (id, user_id, provider, service_name, resource_id, anomaly_type, expected_cost, actual_cost, deviation, severity, status, notes, detected_at, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+		INSERT INTO cost_anomalies (id, user_id, service_name, anomaly_type, expected_cost, actual_cost, deviation_percentage, severity, status, description, detected_at, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 	`
 	_, err := r.db.ExecContext(ctx, query,
-		a.ID, a.UserID, a.Provider, a.ServiceName, a.ResourceID, a.AnomalyType,
+		a.ID, a.UserID, a.ServiceName, a.AnomalyType,
 		a.ExpectedCost, a.ActualCost, a.Deviation, a.Severity, a.Status, a.Notes,
 		a.DetectedAt, time.Now(),
 	)
@@ -246,13 +242,13 @@ func (r *CostRepository) CreateAnomaly(ctx context.Context, a *cost.CostAnomaly)
 // GetAnomaly retrieves an anomaly by ID
 func (r *CostRepository) GetAnomaly(ctx context.Context, id string) (*cost.CostAnomaly, error) {
 	query := `
-		SELECT id, user_id, provider, service_name, resource_id, anomaly_type, expected_cost, actual_cost, deviation, severity, status, notes, detected_at, created_at
+		SELECT id, user_id, service_name, anomaly_type, expected_cost, actual_cost, deviation_percentage, severity, status, description, detected_at, created_at
 		FROM cost_anomalies
 		WHERE id = $1
 	`
 	a := &cost.CostAnomaly{}
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
-		&a.ID, &a.UserID, &a.Provider, &a.ServiceName, &a.ResourceID, &a.AnomalyType,
+		&a.ID, &a.UserID, &a.ServiceName, &a.AnomalyType,
 		&a.ExpectedCost, &a.ActualCost, &a.Deviation, &a.Severity, &a.Status, &a.Notes,
 		&a.DetectedAt, &a.CreatedAt,
 	)
@@ -264,7 +260,7 @@ func (r *CostRepository) GetAnomaly(ctx context.Context, id string) (*cost.CostA
 
 // UpdateAnomaly updates an anomaly
 func (r *CostRepository) UpdateAnomaly(ctx context.Context, a *cost.CostAnomaly) error {
-	query := `UPDATE cost_anomalies SET status = $1, notes = $2 WHERE id = $3`
+	query := `UPDATE cost_anomalies SET status = $1, description = $2 WHERE id = $3`
 	_, err := r.db.ExecContext(ctx, query, a.Status, a.Notes, a.ID)
 	return err
 }
@@ -288,10 +284,9 @@ func (r *CostRepository) ListAnomalies(ctx context.Context, userID int64, status
 		return nil, 0, err
 	}
 
-	// Reset for main query
 	paramN = 1
 	query := fmt.Sprintf(`
-		SELECT id, user_id, provider, service_name, resource_id, anomaly_type, expected_cost, actual_cost, deviation, severity, status, notes, detected_at, created_at
+		SELECT id, user_id, service_name, anomaly_type, expected_cost, actual_cost, deviation_percentage, severity, status, description, detected_at, created_at
 		FROM cost_anomalies
 		WHERE user_id = $%d
 	`, paramN)
@@ -317,7 +312,7 @@ func (r *CostRepository) ListAnomalies(ctx context.Context, userID int64, status
 	for rows.Next() {
 		a := &cost.CostAnomaly{}
 		err := rows.Scan(
-			&a.ID, &a.UserID, &a.Provider, &a.ServiceName, &a.ResourceID, &a.AnomalyType,
+			&a.ID, &a.UserID, &a.ServiceName, &a.AnomalyType,
 			&a.ExpectedCost, &a.ActualCost, &a.Deviation, &a.Severity, &a.Status, &a.Notes,
 			&a.DetectedAt, &a.CreatedAt,
 		)
@@ -336,16 +331,14 @@ func (r *CostRepository) CreateOptimization(ctx context.Context, o *cost.CostOpt
 		o.ID = uuid.New().String()
 	}
 
-	detailsJSON, _ := json.Marshal(o.Details)
-
 	query := `
-		INSERT INTO cost_optimizations (id, user_id, provider, resource_id, resource_type, optimization_type, title, description, current_cost, estimated_savings, savings_percent, implementation, status, details, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+		INSERT INTO cost_optimizations (id, user_id, provider, resource_id, type, title, description, current_cost, estimated_savings, savings_percentage, implementation_effort, status, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 	`
 	_, err := r.db.ExecContext(ctx, query,
-		o.ID, o.UserID, o.Provider, o.ResourceID, o.ResourceType, o.OptimizationType,
+		o.ID, o.UserID, o.Provider, o.ResourceID, o.OptimizationType,
 		o.Title, o.Description, o.CurrentCost, o.EstimatedSavings, o.SavingsPercent,
-		o.Implementation, o.Status, detailsJSON, time.Now(), time.Now(),
+		o.Implementation, o.Status, time.Now(), time.Now(),
 	)
 	return err
 }
@@ -353,15 +346,15 @@ func (r *CostRepository) CreateOptimization(ctx context.Context, o *cost.CostOpt
 // GetOptimization retrieves an optimization by ID
 func (r *CostRepository) GetOptimization(ctx context.Context, id string) (*cost.CostOptimization, error) {
 	query := `
-		SELECT id, user_id, provider, resource_id, resource_type, optimization_type, title, description, current_cost, estimated_savings, savings_percent, implementation, status, details, created_at, updated_at
+		SELECT id, user_id, provider, resource_id, type, title, description, current_cost, estimated_savings, savings_percentage, implementation_effort, status, created_at, updated_at
 		FROM cost_optimizations
 		WHERE id = $1
 	`
 	o := &cost.CostOptimization{}
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
-		&o.ID, &o.UserID, &o.Provider, &o.ResourceID, &o.ResourceType, &o.OptimizationType,
+		&o.ID, &o.UserID, &o.Provider, &o.ResourceID, &o.OptimizationType,
 		&o.Title, &o.Description, &o.CurrentCost, &o.EstimatedSavings, &o.SavingsPercent,
-		&o.Implementation, &o.Status, &o.Details, &o.CreatedAt, &o.UpdatedAt,
+		&o.Implementation, &o.Status, &o.CreatedAt, &o.UpdatedAt,
 	)
 	if err != nil {
 		return nil, err
@@ -395,10 +388,9 @@ func (r *CostRepository) ListOptimizations(ctx context.Context, userID int64, st
 		return nil, 0, err
 	}
 
-	// Reset for main query
 	paramN = 1
 	query := fmt.Sprintf(`
-		SELECT id, user_id, provider, resource_id, resource_type, optimization_type, title, description, current_cost, estimated_savings, savings_percent, implementation, status, details, created_at, updated_at
+		SELECT id, user_id, provider, resource_id, type, title, description, current_cost, estimated_savings, savings_percentage, implementation_effort, status, created_at, updated_at
 		FROM cost_optimizations
 		WHERE user_id = $%d
 	`, paramN)
@@ -424,9 +416,9 @@ func (r *CostRepository) ListOptimizations(ctx context.Context, userID int64, st
 	for rows.Next() {
 		o := &cost.CostOptimization{}
 		err := rows.Scan(
-			&o.ID, &o.UserID, &o.Provider, &o.ResourceID, &o.ResourceType, &o.OptimizationType,
+			&o.ID, &o.UserID, &o.Provider, &o.ResourceID, &o.OptimizationType,
 			&o.Title, &o.Description, &o.CurrentCost, &o.EstimatedSavings, &o.SavingsPercent,
-			&o.Implementation, &o.Status, &o.Details, &o.CreatedAt, &o.UpdatedAt,
+			&o.Implementation, &o.Status, &o.CreatedAt, &o.UpdatedAt,
 		)
 		if err != nil {
 			return nil, 0, err

@@ -36,10 +36,9 @@ func (s *AnomalyService) Create(ctx context.Context, a *anomaly.Anomaly) (int64,
 	s.logger.WithFields(map[string]interface{}{
 		"anomaly_id":   id,
 		"user_id":      a.UserID,
-		"resource_id":  a.ResourceID,
 		"severity":     a.Severity,
 		"anomaly_type": a.AnomalyType,
-		"percentage":   a.Percentage,
+		"deviation":    a.DeviationPercentage,
 	}).Info("Anomaly created")
 
 	return id, nil
@@ -58,26 +57,26 @@ func (s *AnomalyService) Update(ctx context.Context, userID int64, id int64, upd
 	}
 
 	// Apply updates
-	if resourceID, ok := updates["resource_id"].(string); ok {
-		a.ResourceID = resourceID
-	}
 	if anomalyType, ok := updates["anomaly_type"].(string); ok {
 		a.AnomalyType = anomalyType
 	}
 	if severity, ok := updates["severity"].(string); ok {
 		a.Severity = severity
 	}
-	if percentage, ok := updates["percentage"].(int); ok {
-		a.Percentage = percentage
+	if deviation, ok := updates["deviation_percentage"].(float64); ok {
+		a.DeviationPercentage = deviation
 	}
-	if previousCost, ok := updates["previous_cost"].(int); ok {
-		a.PreviousCost = previousCost
+	if expectedCost, ok := updates["expected_cost"].(float64); ok {
+		a.ExpectedCost = expectedCost
 	}
-	if currentCost, ok := updates["current_cost"].(int); ok {
-		a.CurrentCost = currentCost
+	if actualCost, ok := updates["actual_cost"].(float64); ok {
+		a.ActualCost = actualCost
 	}
 	if status, ok := updates["status"].(string); ok {
 		a.Status = status
+	}
+	if description, ok := updates["description"].(string); ok {
+		a.Description = description
 	}
 
 	err = s.repo.Update(ctx, a)

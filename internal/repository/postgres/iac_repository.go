@@ -32,7 +32,6 @@ func (r *IaCRepository) CreateDefinition(ctx context.Context, def *iac.IaCDefini
 	def.CreatedAt = now
 	def.UpdatedAt = now
 
-	// Serialize parsed resources to JSON
 	var parsedResourcesJSON sql.NullString
 	if def.ParsedResources != nil {
 		data, err := json.Marshal(def.ParsedResources)
@@ -44,7 +43,7 @@ func (r *IaCRepository) CreateDefinition(ctx context.Context, def *iac.IaCDefini
 
 	query := `
 		INSERT INTO iac_definitions
-		(id, user_id, name, iac_type, file_path, content, parsed_resources, last_parsed, created_at, updated_at)
+		(id, user_id, name, type, file_path, content, parsed_resources, last_validated_at, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 	`
 
@@ -71,7 +70,7 @@ func (r *IaCRepository) CreateDefinition(ctx context.Context, def *iac.IaCDefini
 // GetDefinitionByID retrieves an IaC definition by ID
 func (r *IaCRepository) GetDefinitionByID(ctx context.Context, userID, definitionID string) (*iac.IaCDefinition, error) {
 	query := `
-		SELECT id, user_id, name, iac_type, file_path, content, parsed_resources, last_parsed, created_at, updated_at
+		SELECT id, user_id, name, type, file_path, content, parsed_resources, last_validated_at, created_at, updated_at
 		FROM iac_definitions
 		WHERE id = $1 AND user_id = $2
 	`
@@ -100,7 +99,6 @@ func (r *IaCRepository) GetDefinitionByID(ctx context.Context, userID, definitio
 		return nil, errors.DatabaseError("Failed to get IaC definition", err)
 	}
 
-	// Deserialize parsed resources
 	if parsedResourcesJSON.Valid {
 		if err := json.Unmarshal([]byte(parsedResourcesJSON.String), &def.ParsedResources); err != nil {
 			return nil, errors.DatabaseError("Failed to unmarshal parsed resources", err)
@@ -118,7 +116,7 @@ func (r *IaCRepository) GetDefinitionByID(ctx context.Context, userID, definitio
 func (r *IaCRepository) ListDefinitions(ctx context.Context, userID string, iacType *iac.IaCType) ([]*iac.IaCDefinition, error) {
 	paramN := 1
 	query := fmt.Sprintf(`
-		SELECT id, user_id, name, iac_type, file_path, content, parsed_resources, last_parsed, created_at, updated_at
+		SELECT id, user_id, name, type, file_path, content, parsed_resources, last_validated_at, created_at, updated_at
 		FROM iac_definitions
 		WHERE user_id = $%d
 	`, paramN)
@@ -127,7 +125,7 @@ func (r *IaCRepository) ListDefinitions(ctx context.Context, userID string, iacT
 	paramN++
 
 	if iacType != nil {
-		query += fmt.Sprintf(" AND iac_type = $%d", paramN)
+		query += fmt.Sprintf(" AND type = $%d", paramN)
 		args = append(args, *iacType)
 		paramN++
 	}
@@ -163,7 +161,6 @@ func (r *IaCRepository) ListDefinitions(ctx context.Context, userID string, iacT
 			return nil, errors.DatabaseError("Failed to scan IaC definition", err)
 		}
 
-		// Deserialize parsed resources
 		if parsedResourcesJSON.Valid {
 			if err := json.Unmarshal([]byte(parsedResourcesJSON.String), &def.ParsedResources); err != nil {
 				return nil, errors.DatabaseError("Failed to unmarshal parsed resources", err)
@@ -184,7 +181,6 @@ func (r *IaCRepository) ListDefinitions(ctx context.Context, userID string, iacT
 func (r *IaCRepository) UpdateDefinition(ctx context.Context, def *iac.IaCDefinition) error {
 	def.UpdatedAt = time.Now()
 
-	// Serialize parsed resources
 	var parsedResourcesJSON sql.NullString
 	if def.ParsedResources != nil {
 		data, err := json.Marshal(def.ParsedResources)
@@ -196,7 +192,7 @@ func (r *IaCRepository) UpdateDefinition(ctx context.Context, def *iac.IaCDefini
 
 	query := `
 		UPDATE iac_definitions
-		SET name = $1, content = $2, parsed_resources = $3, last_parsed = $4, updated_at = $5
+		SET name = $1, content = $2, parsed_resources = $3, last_validated_at = $4, updated_at = $5
 		WHERE id = $6 AND user_id = $7
 	`
 
@@ -256,7 +252,6 @@ func (r *IaCRepository) CreateResource(ctx context.Context, res *iac.IaCResource
 	now := time.Now()
 	res.CreatedAt = now
 
-	// Serialize configuration
 	configJSON, err := json.Marshal(res.Configuration)
 	if err != nil {
 		return errors.DatabaseError("Failed to marshal configuration", err)
@@ -264,7 +259,7 @@ func (r *IaCRepository) CreateResource(ctx context.Context, res *iac.IaCResource
 
 	query := `
 		INSERT INTO iac_resources
-		(id, iac_definition_id, user_id, resource_type, resource_name, resource_address, provider, configuration, created_at)
+		(id, definition_id, user_id, resource_type, resource_name, resource_address, provider, properties, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 	`
 
@@ -290,9 +285,9 @@ func (r *IaCRepository) CreateResource(ctx context.Context, res *iac.IaCResource
 // ListResourcesByDefinition lists all resources for an IaC definition
 func (r *IaCRepository) ListResourcesByDefinition(ctx context.Context, userID, definitionID string) ([]*iac.IaCResource, error) {
 	query := `
-		SELECT id, iac_definition_id, user_id, resource_type, resource_name, resource_address, provider, configuration, created_at
+		SELECT id, definition_id, user_id, resource_type, resource_name, resource_address, provider, properties, created_at
 		FROM iac_resources
-		WHERE iac_definition_id = $1 AND user_id = $2
+		WHERE definition_id = $1 AND user_id = $2
 		ORDER BY resource_type, resource_name
 	`
 
@@ -323,7 +318,6 @@ func (r *IaCRepository) ListResourcesByDefinition(ctx context.Context, userID, d
 			return nil, errors.DatabaseError("Failed to scan IaC resource", err)
 		}
 
-		// Deserialize configuration
 		if err := json.Unmarshal([]byte(configJSON), &res.Configuration); err != nil {
 			return nil, errors.DatabaseError("Failed to unmarshal configuration", err)
 		}
@@ -336,7 +330,7 @@ func (r *IaCRepository) ListResourcesByDefinition(ctx context.Context, userID, d
 
 // DeleteResourcesByDefinition deletes all resources for an IaC definition
 func (r *IaCRepository) DeleteResourcesByDefinition(ctx context.Context, userID, definitionID string) error {
-	query := `DELETE FROM iac_resources WHERE iac_definition_id = $1 AND user_id = $2`
+	query := `DELETE FROM iac_resources WHERE definition_id = $1 AND user_id = $2`
 
 	_, err := r.db.ExecContext(ctx, query, definitionID, userID)
 	if err != nil {
@@ -355,47 +349,33 @@ func (r *IaCRepository) CreateDriftResult(ctx context.Context, drift *iac.IaCDri
 	now := time.Now()
 	drift.DetectedAt = now
 
-	// Serialize details
-	var detailsJSON sql.NullString
+	var differencesJSON sql.NullString
 	if drift.Details != nil {
 		data, err := json.Marshal(drift.Details)
 		if err != nil {
-			return errors.DatabaseError("Failed to marshal details", err)
+			return errors.DatabaseError("Failed to marshal differences", err)
 		}
-		detailsJSON = sql.NullString{String: string(data), Valid: true}
+		differencesJSON = sql.NullString{String: string(data), Valid: true}
 	}
 
-	// Convert pointers to nullable types
 	var severityStr sql.NullString
 	if drift.Severity != nil {
 		severityStr = sql.NullString{String: string(*drift.Severity), Valid: true}
 	}
 
-	var iacResourceID sql.NullString
-	if drift.IaCResourceID != nil {
-		iacResourceID = sql.NullString{String: *drift.IaCResourceID, Valid: true}
-	}
-
-	var actualResourceID sql.NullString
-	if drift.ActualResourceID != nil {
-		actualResourceID = sql.NullString{String: *drift.ActualResourceID, Valid: true}
-	}
-
 	query := `
 		INSERT INTO iac_drift_results
-		(id, user_id, iac_definition_id, iac_resource_id, actual_resource_id, drift_category, severity, details, detected_at, status, resolved_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		(id, user_id, definition_id, drift_category, severity, differences, detected_at, status, resolved_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 	`
 
 	_, err := r.db.ExecContext(ctx, query,
 		drift.ID,
 		drift.UserID,
 		drift.IaCDefinitionID,
-		iacResourceID,
-		actualResourceID,
 		drift.DriftCategory,
 		severityStr,
-		detailsJSON,
+		differencesJSON,
 		drift.DetectedAt,
 		drift.Status,
 		drift.ResolvedAt,
@@ -412,7 +392,7 @@ func (r *IaCRepository) CreateDriftResult(ctx context.Context, drift *iac.IaCDri
 func (r *IaCRepository) ListDriftResults(ctx context.Context, userID string, definitionID *string, category *iac.DriftCategory, status *iac.DriftStatus) ([]*iac.IaCDriftResult, error) {
 	paramN := 1
 	query := fmt.Sprintf(`
-		SELECT id, user_id, iac_definition_id, iac_resource_id, actual_resource_id, drift_category, severity, details, detected_at, status, resolved_at
+		SELECT id, user_id, definition_id, drift_category, severity, differences, detected_at, status, resolved_at
 		FROM iac_drift_results
 		WHERE user_id = $%d
 	`, paramN)
@@ -421,7 +401,7 @@ func (r *IaCRepository) ListDriftResults(ctx context.Context, userID string, def
 	paramN++
 
 	if definitionID != nil {
-		query += fmt.Sprintf(" AND iac_definition_id = $%d", paramN)
+		query += fmt.Sprintf(" AND definition_id = $%d", paramN)
 		args = append(args, *definitionID)
 		paramN++
 	}
@@ -450,21 +430,17 @@ func (r *IaCRepository) ListDriftResults(ctx context.Context, userID string, def
 
 	for rows.Next() {
 		var drift iac.IaCDriftResult
-		var detailsJSON sql.NullString
+		var differencesJSON sql.NullString
 		var severityStr sql.NullString
-		var iacResourceID sql.NullString
-		var actualResourceID sql.NullString
 		var resolvedAt sql.NullTime
 
 		err := rows.Scan(
 			&drift.ID,
 			&drift.UserID,
 			&drift.IaCDefinitionID,
-			&iacResourceID,
-			&actualResourceID,
 			&drift.DriftCategory,
 			&severityStr,
-			&detailsJSON,
+			&differencesJSON,
 			&drift.DetectedAt,
 			&drift.Status,
 			&resolvedAt,
@@ -473,25 +449,15 @@ func (r *IaCRepository) ListDriftResults(ctx context.Context, userID string, def
 			return nil, errors.DatabaseError("Failed to scan drift result", err)
 		}
 
-		// Deserialize details
-		if detailsJSON.Valid {
-			if err := json.Unmarshal([]byte(detailsJSON.String), &drift.Details); err != nil {
-				return nil, errors.DatabaseError("Failed to unmarshal details", err)
+		if differencesJSON.Valid {
+			if err := json.Unmarshal([]byte(differencesJSON.String), &drift.Details); err != nil {
+				return nil, errors.DatabaseError("Failed to unmarshal differences", err)
 			}
 		}
 
-		// Convert nullable types to pointers
 		if severityStr.Valid {
 			severity := iac.Severity(severityStr.String)
 			drift.Severity = &severity
-		}
-
-		if iacResourceID.Valid {
-			drift.IaCResourceID = &iacResourceID.String
-		}
-
-		if actualResourceID.Valid {
-			drift.ActualResourceID = &actualResourceID.String
 		}
 
 		if resolvedAt.Valid {
@@ -550,7 +516,7 @@ func (r *IaCRepository) GetDriftSummary(ctx context.Context, userID string, defi
 	paramN += 2
 
 	if definitionID != nil {
-		query += fmt.Sprintf(" AND iac_definition_id = $%d", paramN)
+		query += fmt.Sprintf(" AND definition_id = $%d", paramN)
 		args = append(args, *definitionID)
 		paramN++
 	}
@@ -582,12 +548,10 @@ func (r *IaCRepository) GetDriftSummary(ctx context.Context, userID string, defi
 
 		total += count
 
-		// Add to category count
 		if byCat, ok := summary["by_category"].(map[string]int); ok {
 			byCat[category] = byCat[category] + count
 		}
 
-		// Add to severity count
 		if severity.Valid {
 			if bySev, ok := summary["by_severity"].(map[string]int); ok {
 				bySev[severity.String] = bySev[severity.String] + count

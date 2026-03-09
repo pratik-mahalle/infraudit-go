@@ -33,7 +33,7 @@ func (r *JobRepository) CreateJob(ctx context.Context, j *job.ScheduledJob) erro
 	}
 
 	query := `
-		INSERT INTO scheduled_jobs (id, user_id, job_type, schedule, is_enabled, config, last_run, next_run, created_at, updated_at)
+		INSERT INTO scheduled_jobs (id, user_id, type, schedule, is_enabled, config, last_run_at, next_run_at, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 	`
 
@@ -63,7 +63,7 @@ func (r *JobRepository) CreateJob(ctx context.Context, j *job.ScheduledJob) erro
 // GetJob retrieves a scheduled job by ID
 func (r *JobRepository) GetJob(ctx context.Context, id string) (*job.ScheduledJob, error) {
 	query := `
-		SELECT id, user_id, job_type, schedule, is_enabled, config, last_run, next_run, created_at, updated_at
+		SELECT id, user_id, type, schedule, is_enabled, config, last_run_at, next_run_at, created_at, updated_at
 		FROM scheduled_jobs
 		WHERE id = $1
 	`
@@ -110,9 +110,9 @@ func (r *JobRepository) GetJob(ctx context.Context, id string) (*job.ScheduledJo
 // GetJobByUserAndType retrieves a job by user ID and job type
 func (r *JobRepository) GetJobByUserAndType(ctx context.Context, userID int64, jobType job.JobType) (*job.ScheduledJob, error) {
 	query := `
-		SELECT id, user_id, job_type, schedule, is_enabled, config, last_run, next_run, created_at, updated_at
+		SELECT id, user_id, type, schedule, is_enabled, config, last_run_at, next_run_at, created_at, updated_at
 		FROM scheduled_jobs
-		WHERE user_id = $1 AND job_type = $2
+		WHERE user_id = $1 AND type = $2
 	`
 
 	var j job.ScheduledJob
@@ -163,7 +163,7 @@ func (r *JobRepository) UpdateJob(ctx context.Context, j *job.ScheduledJob) erro
 
 	query := `
 		UPDATE scheduled_jobs
-		SET schedule = $1, is_enabled = $2, config = $3, last_run = $4, next_run = $5, updated_at = $6
+		SET schedule = $1, is_enabled = $2, config = $3, last_run_at = $4, next_run_at = $5, updated_at = $6
 		WHERE id = $7
 	`
 
@@ -211,7 +211,7 @@ func (r *JobRepository) DeleteJob(ctx context.Context, id string) error {
 func (r *JobRepository) ListJobs(ctx context.Context, userID int64, filter job.Filter, limit, offset int) ([]*job.ScheduledJob, int64, error) {
 	paramN := 1
 	query := fmt.Sprintf(`
-		SELECT id, user_id, job_type, schedule, is_enabled, config, last_run, next_run, created_at, updated_at
+		SELECT id, user_id, type, schedule, is_enabled, config, last_run_at, next_run_at, created_at, updated_at
 		FROM scheduled_jobs
 		WHERE user_id = $%d
 	`, paramN)
@@ -220,8 +220,8 @@ func (r *JobRepository) ListJobs(ctx context.Context, userID int64, filter job.F
 	paramN++
 
 	if filter.JobType != "" {
-		query += fmt.Sprintf(" AND job_type = $%d", paramN)
-		countQuery += fmt.Sprintf(" AND job_type = $%d", paramN)
+		query += fmt.Sprintf(" AND type = $%d", paramN)
+		countQuery += fmt.Sprintf(" AND type = $%d", paramN)
 		args = append(args, string(filter.JobType))
 		paramN++
 	}
@@ -290,10 +290,10 @@ func (r *JobRepository) ListJobs(ctx context.Context, userID int64, filter job.F
 // GetEnabledJobs retrieves all enabled jobs
 func (r *JobRepository) GetEnabledJobs(ctx context.Context) ([]*job.ScheduledJob, error) {
 	query := `
-		SELECT id, user_id, job_type, schedule, is_enabled, config, last_run, next_run, created_at, updated_at
+		SELECT id, user_id, type, schedule, is_enabled, config, last_run_at, next_run_at, created_at, updated_at
 		FROM scheduled_jobs
 		WHERE is_enabled = true
-		ORDER BY next_run ASC
+		ORDER BY next_run_at ASC
 	`
 
 	rows, err := r.db.QueryContext(ctx, query)
@@ -346,7 +346,7 @@ func (r *JobRepository) GetEnabledJobs(ctx context.Context) ([]*job.ScheduledJob
 func (r *JobRepository) UpdateLastRun(ctx context.Context, id string, lastRun, nextRun interface{}) error {
 	query := `
 		UPDATE scheduled_jobs
-		SET last_run = $1, next_run = $2, updated_at = $3
+		SET last_run_at = $1, next_run_at = $2, updated_at = $3
 		WHERE id = $4
 	`
 

@@ -28,7 +28,7 @@ func (r *ComplianceRepository) CreateFramework(ctx context.Context, f *complianc
 	}
 
 	query := `
-		INSERT INTO compliance_frameworks (id, name, version, description, provider, is_enabled, created_at, updated_at)
+		INSERT INTO compliance_frameworks (id, name, version, description, provider, is_active, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 	`
 	_, err := r.db.ExecContext(ctx, query,
@@ -41,7 +41,7 @@ func (r *ComplianceRepository) CreateFramework(ctx context.Context, f *complianc
 // GetFramework retrieves a framework by ID
 func (r *ComplianceRepository) GetFramework(ctx context.Context, id string) (*compliance.Framework, error) {
 	query := `
-		SELECT id, name, version, description, provider, is_enabled, created_at, updated_at
+		SELECT id, name, version, description, provider, is_active, created_at, updated_at
 		FROM compliance_frameworks
 		WHERE id = $1
 	`
@@ -63,7 +63,7 @@ func (r *ComplianceRepository) GetFramework(ctx context.Context, id string) (*co
 // GetFrameworkByName retrieves a framework by name
 func (r *ComplianceRepository) GetFrameworkByName(ctx context.Context, name string) (*compliance.Framework, error) {
 	query := `
-		SELECT id, name, version, description, provider, is_enabled, created_at, updated_at
+		SELECT id, name, version, description, provider, is_active, created_at, updated_at
 		FROM compliance_frameworks
 		WHERE name = $1
 	`
@@ -85,7 +85,7 @@ func (r *ComplianceRepository) GetFrameworkByName(ctx context.Context, name stri
 // ListFrameworks lists all frameworks
 func (r *ComplianceRepository) ListFrameworks(ctx context.Context) ([]*compliance.Framework, error) {
 	query := `
-		SELECT id, name, version, description, provider, is_enabled, created_at, updated_at
+		SELECT id, name, version, description, provider, is_active, created_at, updated_at
 		FROM compliance_frameworks
 		ORDER BY name
 	`
@@ -117,7 +117,7 @@ func (r *ComplianceRepository) ListFrameworks(ctx context.Context) ([]*complianc
 
 // UpdateFramework updates a framework
 func (r *ComplianceRepository) UpdateFramework(ctx context.Context, f *compliance.Framework) error {
-	query := `UPDATE compliance_frameworks SET is_enabled = $1, updated_at = $2 WHERE id = $3`
+	query := `UPDATE compliance_frameworks SET is_active = $1, updated_at = $2 WHERE id = $3`
 	_, err := r.db.ExecContext(ctx, query, f.IsEnabled, time.Now(), f.ID)
 	return err
 }
@@ -129,7 +129,7 @@ func (r *ComplianceRepository) CreateControl(ctx context.Context, c *compliance.
 	}
 
 	query := `
-		INSERT INTO compliance_controls (id, framework_id, control_id, title, description, category, severity, remediation, reference_url, created_at)
+		INSERT INTO compliance_controls (id, framework_id, control_id, title, description, category, severity, remediation_steps, reference_url, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 	`
 	_, err := r.db.ExecContext(ctx, query,
@@ -142,7 +142,7 @@ func (r *ComplianceRepository) CreateControl(ctx context.Context, c *compliance.
 // GetControl retrieves a control by ID
 func (r *ComplianceRepository) GetControl(ctx context.Context, id string) (*compliance.Control, error) {
 	query := `
-		SELECT id, framework_id, control_id, title, description, category, severity, remediation, reference_url, created_at
+		SELECT id, framework_id, control_id, title, description, category, severity, remediation_steps, reference_url, created_at
 		FROM compliance_controls
 		WHERE id = $1
 	`
@@ -160,7 +160,7 @@ func (r *ComplianceRepository) GetControl(ctx context.Context, id string) (*comp
 // GetControlByFrameworkAndID retrieves a control by framework ID and control ID
 func (r *ComplianceRepository) GetControlByFrameworkAndID(ctx context.Context, frameworkID, controlID string) (*compliance.Control, error) {
 	query := `
-		SELECT id, framework_id, control_id, title, description, category, severity, remediation, reference_url, created_at
+		SELECT id, framework_id, control_id, title, description, category, severity, remediation_steps, reference_url, created_at
 		FROM compliance_controls
 		WHERE framework_id = $1 AND control_id = $2
 	`
@@ -179,7 +179,7 @@ func (r *ComplianceRepository) GetControlByFrameworkAndID(ctx context.Context, f
 func (r *ComplianceRepository) ListControls(ctx context.Context, frameworkID string, category string) ([]*compliance.Control, error) {
 	paramN := 1
 	query := fmt.Sprintf(`
-		SELECT id, framework_id, control_id, title, description, category, severity, remediation, reference_url, created_at
+		SELECT id, framework_id, control_id, title, description, category, severity, remediation_steps, reference_url, created_at
 		FROM compliance_controls
 		WHERE framework_id = $%d
 	`, paramN)
@@ -231,12 +231,11 @@ func (r *ComplianceRepository) CreateMapping(ctx context.Context, m *compliance.
 	}
 
 	query := `
-		INSERT INTO compliance_mappings (id, control_id, security_rule_type, resource_type, provider, mapping_confidence, check_query, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		INSERT INTO compliance_mappings (id, control_id, rule_type, rule_config, created_at)
+		VALUES ($1, $2, $3, $4, $5)
 	`
 	_, err := r.db.ExecContext(ctx, query,
-		m.ID, m.ControlID, m.SecurityRuleType, m.ResourceType, m.Provider,
-		m.MappingConfidence, m.CheckQuery, time.Now(),
+		m.ID, m.ControlID, m.SecurityRuleType, m.CheckQuery, time.Now(),
 	)
 	return err
 }
@@ -244,7 +243,7 @@ func (r *ComplianceRepository) CreateMapping(ctx context.Context, m *compliance.
 // GetMappingsForControl retrieves mappings for a control
 func (r *ComplianceRepository) GetMappingsForControl(ctx context.Context, controlID string) ([]*compliance.ControlMapping, error) {
 	query := `
-		SELECT id, control_id, security_rule_type, resource_type, provider, mapping_confidence, check_query
+		SELECT id, control_id, rule_type, rule_config
 		FROM compliance_mappings
 		WHERE control_id = $1
 	`
@@ -258,8 +257,7 @@ func (r *ComplianceRepository) GetMappingsForControl(ctx context.Context, contro
 	for rows.Next() {
 		m := &compliance.ControlMapping{}
 		err := rows.Scan(
-			&m.ID, &m.ControlID, &m.SecurityRuleType, &m.ResourceType, &m.Provider,
-			&m.MappingConfidence, &m.CheckQuery,
+			&m.ID, &m.ControlID, &m.SecurityRuleType, &m.CheckQuery,
 		)
 		if err != nil {
 			return nil, err
@@ -272,22 +270,12 @@ func (r *ComplianceRepository) GetMappingsForControl(ctx context.Context, contro
 
 // GetMappingsForSecurityRule retrieves mappings for a security rule type
 func (r *ComplianceRepository) GetMappingsForSecurityRule(ctx context.Context, ruleType string, resourceType string) ([]*compliance.ControlMapping, error) {
-	paramN := 1
-	query := fmt.Sprintf(`
-		SELECT id, control_id, security_rule_type, resource_type, provider, mapping_confidence, check_query
+	query := `
+		SELECT id, control_id, rule_type, rule_config
 		FROM compliance_mappings
-		WHERE security_rule_type = $%d
-	`, paramN)
-	args := []interface{}{ruleType}
-	paramN++
-
-	if resourceType != "" {
-		query += fmt.Sprintf(" AND (resource_type = $%d OR resource_type IS NULL)", paramN)
-		args = append(args, resourceType)
-		paramN++
-	}
-
-	rows, err := r.db.QueryContext(ctx, query, args...)
+		WHERE rule_type = $1
+	`
+	rows, err := r.db.QueryContext(ctx, query, ruleType)
 	if err != nil {
 		return nil, err
 	}
@@ -297,8 +285,7 @@ func (r *ComplianceRepository) GetMappingsForSecurityRule(ctx context.Context, r
 	for rows.Next() {
 		m := &compliance.ControlMapping{}
 		err := rows.Scan(
-			&m.ID, &m.ControlID, &m.SecurityRuleType, &m.ResourceType, &m.Provider,
-			&m.MappingConfidence, &m.CheckQuery,
+			&m.ID, &m.ControlID, &m.SecurityRuleType, &m.CheckQuery,
 		)
 		if err != nil {
 			return nil, err
@@ -318,7 +305,7 @@ func (r *ComplianceRepository) CreateAssessment(ctx context.Context, a *complian
 	findingsJSON, _ := json.Marshal(a.Findings)
 
 	query := `
-		INSERT INTO compliance_assessments (id, user_id, framework_id, framework_name, assessment_date, total_controls, passed_controls, failed_controls, not_applicable_controls, compliance_percent, findings, status, created_at)
+		INSERT INTO compliance_assessments (id, user_id, framework_id, framework_name, assessment_date, total_controls, passed_controls, failed_controls, skipped_controls, compliance_percentage, results, status, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 	`
 	_, err := r.db.ExecContext(ctx, query,
@@ -332,7 +319,7 @@ func (r *ComplianceRepository) CreateAssessment(ctx context.Context, a *complian
 // GetAssessment retrieves an assessment by ID
 func (r *ComplianceRepository) GetAssessment(ctx context.Context, id string) (*compliance.Assessment, error) {
 	query := `
-		SELECT id, user_id, framework_id, framework_name, assessment_date, total_controls, passed_controls, failed_controls, not_applicable_controls, compliance_percent, findings, status, created_at
+		SELECT id, user_id, framework_id, framework_name, assessment_date, total_controls, passed_controls, failed_controls, skipped_controls, compliance_percentage, results, status, created_at
 		FROM compliance_assessments
 		WHERE id = $1
 	`
@@ -354,8 +341,8 @@ func (r *ComplianceRepository) UpdateAssessment(ctx context.Context, a *complian
 
 	query := `
 		UPDATE compliance_assessments
-		SET total_controls = $1, passed_controls = $2, failed_controls = $3, not_applicable_controls = $4,
-		    compliance_percent = $5, findings = $6, status = $7
+		SET total_controls = $1, passed_controls = $2, failed_controls = $3, skipped_controls = $4,
+		    compliance_percentage = $5, results = $6, status = $7
 		WHERE id = $8
 	`
 	_, err := r.db.ExecContext(ctx, query,
@@ -384,10 +371,9 @@ func (r *ComplianceRepository) ListAssessments(ctx context.Context, userID int64
 		return nil, 0, err
 	}
 
-	// Reset for main query
 	paramN = 1
 	query := fmt.Sprintf(`
-		SELECT id, user_id, framework_id, framework_name, assessment_date, total_controls, passed_controls, failed_controls, not_applicable_controls, compliance_percent, findings, status, created_at
+		SELECT id, user_id, framework_id, framework_name, assessment_date, total_controls, passed_controls, failed_controls, skipped_controls, compliance_percentage, results, status, created_at
 		FROM compliance_assessments
 		WHERE user_id = $%d
 	`, paramN)
@@ -429,7 +415,7 @@ func (r *ComplianceRepository) ListAssessments(ctx context.Context, userID int64
 // GetLatestAssessment retrieves the latest assessment for a framework
 func (r *ComplianceRepository) GetLatestAssessment(ctx context.Context, userID int64, frameworkID string) (*compliance.Assessment, error) {
 	query := `
-		SELECT id, user_id, framework_id, framework_name, assessment_date, total_controls, passed_controls, failed_controls, not_applicable_controls, compliance_percent, findings, status, created_at
+		SELECT id, user_id, framework_id, framework_name, assessment_date, total_controls, passed_controls, failed_controls, skipped_controls, compliance_percentage, results, status, created_at
 		FROM compliance_assessments
 		WHERE user_id = $1 AND framework_id = $2 AND status = 'completed'
 		ORDER BY assessment_date DESC
